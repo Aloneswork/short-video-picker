@@ -48,7 +48,10 @@ jobs:
             parser_assistant.py preview_cache.py public_browser.py
 
       - name: Check JavaScript syntax
-        run: sed -n '484,1353p' index.html | node --check -
+        run: |
+          python -c "import re,pathlib; html=pathlib.Path('index.html').read_text(encoding='utf-8'); pathlib.Path('.ci-frontend.js').write_text('\n'.join(re.findall(r'<script>(.*?)</script>', html, re.S)), encoding='utf-8')"
+          node --check .ci-frontend.js
+          rm -f .ci-frontend.js
 
       - name: Check release metadata and source cleanliness
         run: |
