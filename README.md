@@ -11,7 +11,7 @@
   </p>
 </div>
 
-当前发行版：**v2.8.0（Build 26）**。应用在本机处理输入、历史、缩略图和下载任务，不需要登录抖音，也不会导入浏览器 Cookie。
+当前发行版：**v2.8.1（Build 27）**。应用在本机处理输入、历史、缩略图和下载任务，不需要登录抖音，也不会导入浏览器 Cookie。
 
 ![主界面：粘贴公开抖音分享内容并解析](assets/screenshots/main-window.png)
 
@@ -33,7 +33,7 @@
 从 [GitHub Releases](https://github.com/Aloneswork/short-video-picker/releases/latest) 下载：
 
 ```text
-short-video-picker-v2.8.0-macOS-arm64.zip
+short-video-picker-v2.8.1-macOS-arm64.zip
 ```
 
 当前预编译版本仅面向 **Apple Silicon（arm64）** 和 **macOS 12 及以上**。解压后将 `视频资源整理.app` 拖入“应用程序”文件夹，再双击运行。正式应用已经内置 Python、Pillow、pywebview 和所需 macOS 框架绑定，目标 Mac 不需要预装 Python。
@@ -41,7 +41,7 @@ short-video-picker-v2.8.0-macOS-arm64.zip
 当前公开包使用 ad-hoc 临时签名，尚未经过 Apple Developer ID 公证。如果 macOS 阻止首次打开，请在 Finder 中按住 Control 点击应用，选择“打开”，核对应用名称后再次确认。不要关闭系统级安全保护，也不要运行来源不明的副本。下载后可以校验 SHA-256：
 
 ```sh
-shasum -a 256 short-video-picker-v2.8.0-macOS-arm64.zip
+shasum -a 256 short-video-picker-v2.8.1-macOS-arm64.zip
 ```
 
 期望值见同一 Release 的 `SHA256SUMS.txt`。
