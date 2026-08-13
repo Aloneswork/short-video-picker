@@ -26,8 +26,6 @@
 - 运行诊断可检查内置 Python、Pillow、WebView、Edge 和 ffmpeg，并导出脱敏诊断包。
 - 解析失败保留明确错误码，可对单条内容原位重新解析。
 
-![运行诊断：仅检查本机组件](assets/screenshots/runtime-diagnostics.png)
-
 ## 下载与安装
 
 从 [GitHub Releases](https://github.com/Aloneswork/short-video-picker/releases/latest) 下载：
