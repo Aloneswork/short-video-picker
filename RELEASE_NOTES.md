@@ -1,4 +1,4 @@
-# 视频资源整理 v2.8.2（Build 28）
+# 视频资源整理 v2.8.3（Build 29）
 
 发布日期：2026-08-13
 
@@ -22,4 +22,4 @@
 - 自包含应用：内置 Python 运行时，不需要用户安装 Python。
 - 仅支持 Apple Silicon（arm64）；最低 macOS 12；Windows 版本暂未提供。
 - ad-hoc 临时签名，尚未 Apple 公证；其他 Mac 首次打开若提示未识别开发者，请右键选择“打开”。
-- 校验方法：`shasum -a 256 视频资源整理-v2.8.2-macOS-arm64.zip`，与 Release 附带的 `SHA256SUMS.txt` 比对。
+- 校验方法：`shasum -a 256 视频资源整理-v2.8.3-macOS-arm64.zip`，与 Release 附带的 `SHA256SUMS.txt` 比对。
