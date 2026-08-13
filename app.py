@@ -71,6 +71,10 @@ if __name__ == "__main__":
         _restore_standard_streams()
         from parser_assistant import main
     else:
+        # A windowed PyInstaller process starts with None streams. Restore them
+        # (or /dev/null) so third-party loggers and native bridges never have to
+        # write through a None stream; harmless when launched from a terminal.
+        _restore_standard_streams()
         from desktop import main
 
     main()

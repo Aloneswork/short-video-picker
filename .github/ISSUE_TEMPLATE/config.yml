@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 想法与使用交流
+    url: https://github.com/Aloneswork/short-video-picker/discussions
+    about: 尚未成形的建议、一般问题和经验分享请优先使用 Discussions。
+  - name: 安全漏洞
+    url: https://github.com/Aloneswork/short-video-picker/security/advisories/new
+    about: 请通过私密漏洞报告联系维护者，不要创建公开 Issue。

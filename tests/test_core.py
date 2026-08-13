@@ -72,9 +72,21 @@ class CoreTests(unittest.TestCase):
         self.assertIn("--parser-assistant", build_script)
         self.assertIn("SIGN_IDENTITY", build_script)
         self.assertIn("NOTARY_PROFILE", build_script)
-        self.assertIn('shasum -a 256 "$ARCHIVE_NAME" > "$CHECKSUM"', build_script)
+        self.assertIn('shasum -a 256 "$STAGING_ARCHIVE"', build_script)
+        self.assertIn('mv "$STAGING_CHECKSUM" "$CHECKSUM"', build_script)
         self.assertIn('json.loads((ROOT / "version.json")', spec)
         self.assertIn('"CFBundleVersion": str(VERSION["build"])', spec)
+        self.assertIn('(str(ROOT / "LICENSE"), ".")', spec)
+        self.assertIn('(str(ROOT / "THIRD_PARTY_NOTICES.md"), ".")', spec)
+        self.assertIn('(str(RELEASE_LICENSES), "THIRD_PARTY_LICENSES")', spec)
+        self.assertIn('公开发行包缺少项目许可证或第三方许可声明', build_script)
+        self.assertIn('collect_release_licenses.py', build_script)
+        self.assertIn('USE_LOCAL_VENDOR="${USE_LOCAL_VENDOR:-0}"', build_script)
+        self.assertIn('"readline"', spec)
+        self.assertIn('LC_ALL=C /usr/bin/grep -F -q', build_script)
+        self.assertIn('STAGING_ARCHIVE="$STAGING_ROOT/release.zip"', build_script)
+        license_script = (root / "scripts" / "collect_release_licenses.py").read_text(encoding="utf-8")
+        self.assertIn('公开发行构建禁止使用 Conda/Anaconda 运行时', license_script)
         sync_script = (root / "scripts" / "sync_release_metadata.py").read_text(encoding="utf-8")
         self.assertIn('CONFIG = json.loads((ROOT / "version.json")', sync_script)
 
@@ -90,6 +102,7 @@ class CoreTests(unittest.TestCase):
 
     def test_source_tree_has_no_legacy_release_artifacts(self):
         root = Path(__file__).resolve().parents[1]
+        ignored_parts = {".git", ".venv", ".venv-public.nosync", "venv", "vendor", "dist.nosync", ".build-staging.nosync"}
         forbidden = (
             ".playwright-cli",
             ".claude",
@@ -99,8 +112,8 @@ class CoreTests(unittest.TestCase):
             "assets/backup-old-icons",
         )
         self.assertEqual([path for path in forbidden if (root / path).exists()], [])
-        self.assertEqual(list(root.rglob("*.dSYM")), [])
-        self.assertEqual([path for path in root.rglob(".DS_Store") if "dist.nosync" not in path.parts], [])
+        self.assertEqual([path for path in root.rglob("*.dSYM") if ignored_parts.isdisjoint(path.parts)], [])
+        self.assertEqual([path for path in root.rglob(".DS_Store") if ignored_parts.isdisjoint(path.parts)], [])
 
     def test_frontend_uses_standard_thumbnail_ratios_and_marks_existing_media(self):
         html = (Path(__file__).resolve().parents[1] / "index.html").read_text(encoding="utf-8")

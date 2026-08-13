@@ -1,0 +1,70 @@
+name: Bug 报告
+description: 报告可复现的解析、下载、界面或兼容性问题
+title: "[Bug] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请勿粘贴 Cookie、令牌、个人路径或无权公开的媒体；安全漏洞请改用 Security 页面的私密报告。
+  - type: checkboxes
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已搜索现有 Issue，未发现相同问题。
+          required: true
+        - label: 我使用的是最新发布版本或最新 main 分支。
+          required: true
+        - label: 这不是需要私密报告的安全漏洞。
+          required: true
+  - type: input
+    attributes:
+      label: 应用版本
+      description: 可在窗口顶部或运行诊断中查看，例如 v2.8.0 (26)。
+      placeholder: v2.8.0 (26)
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: 芯片架构
+      options:
+        - Apple Silicon（arm64）
+        - Intel（x86_64）
+        - 不确定
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: macOS 版本
+      placeholder: macOS 15.6
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 问题描述
+      description: 说明你预期发生什么、实际发生什么。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开应用
+        2. 粘贴公开测试链接
+        3. 点击“解析链接”
+        4. 出现……
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: 错误码
+      description: 如界面显示 PARSE-...，请填写；没有则写“无”。
+      placeholder: PARSE-...
+  - type: textarea
+    attributes:
+      label: 脱敏诊断信息
+      description: 可粘贴必要的脱敏日志摘要。公开链接请确认你有权分享；优先使用可公开的最小测试链接。
+  - type: textarea
+    attributes:
+      label: 补充信息
+      description: 可附不含私人数据的截图，或说明 Edge/ffmpeg 的诊断状态。

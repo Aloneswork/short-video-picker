@@ -15,6 +15,7 @@ from PyInstaller.utils.hooks import collect_data_files
 
 ROOT = Path(os.environ["SHORT_VIDEO_PICKER_ROOT"]).resolve()
 RUNTIME_VENDOR = Path(os.environ["SHORT_VIDEO_PICKER_VENDOR"]).resolve()
+RELEASE_LICENSES = Path(os.environ["SHORT_VIDEO_PICKER_LICENSES"]).resolve()
 if RUNTIME_VENDOR.is_dir():
     sys.path.insert(0, str(RUNTIME_VENDOR))
 
@@ -22,6 +23,9 @@ VERSION = json.loads((ROOT / "version.json").read_text(encoding="utf-8"))
 DATAS = [
     (str(ROOT / "index.html"), "."),
     (str(ROOT / "version.json"), "."),
+    (str(ROOT / "LICENSE"), "."),
+    (str(ROOT / "THIRD_PARTY_NOTICES.md"), "."),
+    (str(RELEASE_LICENSES), "THIRD_PARTY_LICENSES"),
     (str(ROOT / "assets" / "AppIcon.icns"), "assets"),
     (str(ROOT / "assets" / "app-icon-macos.png"), "assets"),
 ]
@@ -89,6 +93,7 @@ a = Analysis(
         "psutil",
         "pygments",
         "qtpy",
+        "readline",
         "service_identity",
         "setuptools",
         "tkinter",

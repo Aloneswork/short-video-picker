@@ -1,0 +1,20 @@
+title: "[建议] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: 感谢分享想法。尚未成形的建议可以先在这里讨论；已经明确、可执行的需求可以随后整理为 Issue。
+  - type: textarea
+    attributes:
+      label: 你想解决什么问题？
+      description: 请描述使用场景、当前阻碍和理想结果。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 可能的方案
+      description: 可以是交互草图、工作流或技术方向，不要求完整。
+  - type: textarea
+    attributes:
+      label: 其他背景
+      description: 请勿粘贴 Cookie、令牌、个人路径或无权公开的链接和媒体。

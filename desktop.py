@@ -30,7 +30,13 @@ from preview_cache import PREVIEW_CACHE_SCHEME, PreviewServer
 
 BASE_DIR = resource_dir()
 VENDOR_DIR = BASE_DIR / "vendor"
-ICON_PATH = BASE_DIR / "assets" / "AppIcon.icns"
+# PyInstaller's macOS bundle keeps real payload files under Contents/Resources
+# while Contents/Frameworks (sys._MEIPASS) exposes them through symlinks.
+# WKWebView refuses file:// URLs whose target is a symlink ("Frame load
+# interrupted", WebKitErrorDomain 102), so resolve to the real file before
+# building the file:// URI. Symlinks elsewhere still work for plain reads.
+INDEX_URL = (BASE_DIR / "index.html").resolve().as_uri()
+ICON_PATH = (BASE_DIR / "assets" / "AppIcon.icns").resolve()
 # Downloads are network-bound, so a small pool overlaps their latency without
 # hammering the CDN. Same-name files are still serialised by a per-name lock so
 # two saves for one resource cannot both decide the target is missing.
@@ -800,7 +806,7 @@ def main() -> None:
     api = PickerApi(preview_server=preview_server)
     window = webview.create_window(
         "视频资源整理",
-        url=(BASE_DIR / "index.html").as_uri(),
+        url=INDEX_URL,
         js_api=api,
         width=820,
         height=600,
@@ -813,13 +819,28 @@ def main() -> None:
         },
     )
     window.events.closing += lambda: _prepare_close(window, api)
+
     def close_resources() -> None:
         api.close()
 
     window.events.closed += close_resources
-    LOGGER.info("desktop_start path=%s python=%s arch=%s", _application_path(), sys.version.split()[0], platform.machine())
+    debug_enabled = os.environ.get("SHORT_VIDEO_PICKER_WEBVIEW_DEBUG") == "1"
+    window.events.shown += lambda: LOGGER.info("webview_event shown")
+    window.events.before_load += lambda: LOGGER.info("webview_event before_load")
+    window.events.loaded += lambda: LOGGER.info("webview_event loaded")
+    if debug_enabled:
+        os.environ["PYWEBVIEW_LOG"] = "DEBUG"
+    LOGGER.info(
+        "desktop_start path=%s python=%s arch=%s debug=%s",
+        _application_path(), sys.version.split()[0], platform.machine(), debug_enabled,
+    )
     try:
-        webview.start(gui="cocoa", private_mode=False, icon=str(ICON_PATH))
+        webview.start(
+            gui="cocoa",
+            private_mode=False,
+            icon=str(ICON_PATH),
+            debug=debug_enabled,
+        )
     except BaseException:
         LOGGER.exception("desktop_fatal")
         raise

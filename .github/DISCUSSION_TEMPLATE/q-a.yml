@@ -1,0 +1,19 @@
+title: "[问答] "
+body:
+  - type: markdown
+    attributes:
+      value: 适合使用方法、构建和一般原理问题。可复现缺陷请改用 Bug Issue；安全漏洞请私下报告。
+  - type: textarea
+    attributes:
+      label: 你的问题
+      description: 说明目标、已经尝试过什么，以及卡在哪里。
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: 版本
+      placeholder: v2.8.0 (26) 或 main 提交 SHA
+  - type: textarea
+    attributes:
+      label: 补充信息
+      description: 请先移除私人数据和敏感凭据。

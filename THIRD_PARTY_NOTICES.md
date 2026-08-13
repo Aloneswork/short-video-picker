@@ -1,6 +1,6 @@
 # Third-party notices
 
-This repository does not grant an open-source license for the application's own source code. All rights are reserved unless the copyright holder states otherwise in writing.
+The application's own source code is licensed under the MIT License; see `LICENSE`.
 
 The application and its build process use the following direct third-party packages. Their own license terms continue to apply:
 
@@ -11,10 +11,9 @@ The application and its build process use the following direct third-party packa
 | Pillow | 12.0.0 | MIT-CMU |
 | pywebview | 6.2.1 | BSD-3-Clause |
 | Bottle | 0.13.4 | MIT |
-| proxy-tools | 0.1.0 | MIT |
+| proxy-tools | 0.1.0 | BSD-2-Clause |
 | typing-extensions | 4.16.0 | PSF-2.0 |
 | websocket-client | 1.9.0 | Apache-2.0 |
 | PyObjC and the listed framework bindings | 12.2.1 | MIT |
 
-This is a direct-dependency notice, not a complete software bill of materials for every native library embedded by Python, Pillow, or the operating system. Before any public binary release, regenerate the dependency inventory from the exact release environment and retain all license files required by the corresponding packages.
-
+This is a direct-dependency notice, not a complete software bill of materials for every native library embedded by Python, Pillow, or the operating system. Public binary releases include this notice, the project's MIT license, and a `THIRD_PARTY_LICENSES` directory generated from the exact release environment. The public build rejects Conda/Anaconda runtimes and stops if a required license text cannot be collected.

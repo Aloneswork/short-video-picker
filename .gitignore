@@ -10,6 +10,7 @@ __pycache__/
 .coverage
 htmlcov/
 .venv/
+.venv-public.nosync/
 venv/
 
 # Local dependency mirrors and build outputs
@@ -28,4 +29,3 @@ dist.nosync/
 .env
 .env.*
 !.env.example
-

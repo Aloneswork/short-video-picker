@@ -12,12 +12,16 @@ if [[ -z "${PYTHON_BIN:-}" ]]; then
 fi
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
+USE_LOCAL_VENDOR="${USE_LOCAL_VENDOR:-0}"
 DIST="$ROOT/dist.nosync"
 FINAL_APP="$DIST/视频资源整理.app"
 STAGING_ROOT="$ROOT/.build-staging.nosync"
 RUNTIME_VENDOR="$STAGING_ROOT/runtime-vendor"
 STAGING_DIST="$STAGING_ROOT/dist"
 STAGING_WORK="$STAGING_ROOT/work"
+RELEASE_LICENSES="$STAGING_ROOT/release-licenses"
+STAGING_ARCHIVE="$STAGING_ROOT/release.zip"
+STAGING_CHECKSUM="$STAGING_ROOT/SHA256SUMS.txt"
 
 if [[ ! -x "$PYTHON_BIN" ]]; then
   echo "构建已停止：未找到 Python 3.13 构建环境：$PYTHON_BIN" >&2
@@ -52,7 +56,8 @@ fi
 
 rm -rf -- "$STAGING_ROOT"
 mkdir -p "$RUNTIME_VENDOR" "$STAGING_DIST" "$STAGING_WORK"
-if [[ -d "$ROOT/vendor/webview" ]]; then
+"$PYTHON_BIN" "$ROOT/scripts/collect_release_licenses.py" --output "$RELEASE_LICENSES"
+if [[ "$USE_LOCAL_VENDOR" == "1" && -d "$ROOT/vendor/webview" ]]; then
   /usr/bin/rsync -a \
     --exclude 'PIL' \
     --exclude 'pillow-*.dist-info' \
@@ -69,6 +74,7 @@ PYTHONPATH="$RUNTIME_VENDOR" "$PYTHON_BIN" -c \
 
 SHORT_VIDEO_PICKER_ROOT="$ROOT" \
 SHORT_VIDEO_PICKER_VENDOR="$RUNTIME_VENDOR" \
+SHORT_VIDEO_PICKER_LICENSES="$RELEASE_LICENSES" \
 PYINSTALLER_CONFIG_DIR="$STAGING_ROOT/pyinstaller-config" \
 PYTHONDONTWRITEBYTECODE=1 \
 PYTHONNOUSERSITE=1 \
@@ -133,6 +139,10 @@ if find "$STAGING_APP" -type f \( -name '*.log' -o -name '.DS_Store' -o -path '*
   echo "构建已停止：应用包仍包含日志或无用命令副本。" >&2
   exit 3
 fi
+if [[ ! -f "$STAGING_APP/Contents/Resources/LICENSE" || ! -f "$STAGING_APP/Contents/Resources/THIRD_PARTY_NOTICES.md" || ! -f "$STAGING_APP/Contents/Resources/THIRD_PARTY_LICENSES/README.txt" ]]; then
+  echo "构建已停止：公开发行包缺少项目许可证或第三方许可声明。" >&2
+  exit 3
+fi
 
 NOTARY_STATUS="未公证"
 if [[ -n "$NOTARY_PROFILE" ]]; then
@@ -148,6 +158,23 @@ if [[ -n "$NOTARY_PROFILE" ]]; then
   NOTARY_STATUS="已公证并装订票据"
 fi
 
+/usr/bin/ditto -c -k --sequesterRsrc --keepParent "$STAGING_APP" "$STAGING_ARCHIVE"
+/usr/bin/shasum -a 256 "$STAGING_ARCHIVE" | /usr/bin/sed "s|  .*|  $ARCHIVE_NAME|" > "$STAGING_CHECKSUM"
+ARCHIVE_LIST="$STAGING_ROOT/archive-list.txt"
+LC_ALL=C /usr/bin/unzip -l "$STAGING_ARCHIVE" > "$ARCHIVE_LIST"
+if ! LC_ALL=C /usr/bin/grep -F -q '/Contents/Resources/LICENSE' "$ARCHIVE_LIST"; then
+  echo "发布已停止：ZIP 中没有检测到项目许可证。" >&2
+  exit 3
+fi
+if ! LC_ALL=C /usr/bin/grep -F -q '/Contents/Resources/THIRD_PARTY_NOTICES.md' "$ARCHIVE_LIST"; then
+  echo "发布已停止：ZIP 中没有检测到第三方许可声明。" >&2
+  exit 3
+fi
+if ! LC_ALL=C /usr/bin/grep -F -q '/Contents/Resources/THIRD_PARTY_LICENSES/README.txt' "$ARCHIVE_LIST"; then
+  echo "发布已停止：ZIP 中没有检测到第三方许可原文目录。" >&2
+  exit 3
+fi
+
 mkdir -p "$DIST"
 if [[ -e "$FINAL_APP" && ! -d "$FINAL_APP" ]]; then
   echo "发布已停止：目标应用路径存在且不是目录。" >&2
@@ -156,9 +183,8 @@ fi
 rm -rf -- "$FINAL_APP"
 mv "$STAGING_APP" "$FINAL_APP"
 rm -f -- "$ARCHIVE" "$CHECKSUM"
-/usr/bin/ditto -c -k --sequesterRsrc --keepParent "$FINAL_APP" "$ARCHIVE"
-cd "$DIST"
-/usr/bin/shasum -a 256 "$ARCHIVE_NAME" > "$CHECKSUM"
+mv "$STAGING_ARCHIVE" "$ARCHIVE"
+mv "$STAGING_CHECKSUM" "$CHECKSUM"
 
 if [[ "$STAGING_ROOT" != "$ROOT/.build-staging.nosync" || -L "$STAGING_ROOT" ]]; then
   echo "发布已停止：构建暂存目录最终清理校验失败。" >&2

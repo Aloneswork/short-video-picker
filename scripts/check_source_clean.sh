@@ -7,6 +7,7 @@ SOURCE_FIND=(
   find "$ROOT"
   -path "$ROOT/.git" -prune -o
   -path "$ROOT/.venv" -prune -o
+  -path "$ROOT/.venv-public.nosync" -prune -o
   -path "$ROOT/venv" -prune -o
   -path "$ROOT/vendor" -prune -o
   -path "$ROOT/dist.nosync" -prune -o

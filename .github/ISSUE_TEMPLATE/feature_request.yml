@@ -1,0 +1,43 @@
+name: 功能建议
+description: 提议新功能、体验优化或文档改进
+title: "[Feature] "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: checkboxes
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已搜索现有 Issue 和 Discussions，未发现相同建议。
+          required: true
+        - label: 这个建议与项目的本地解析、整理或下载工作流有关。
+          required: true
+  - type: textarea
+    attributes:
+      label: 使用场景
+      description: 先描述你遇到的问题，而不只是某个具体实现。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 建议方案
+      description: 说明希望怎样工作、对用户有什么价值。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 可接受的替代方案
+      description: 如果有更小、更安全或兼容性更好的方案，也请说明。
+  - type: dropdown
+    attributes:
+      label: 优先平台
+      options:
+        - macOS
+        - Windows（尚未支持）
+        - 两端通用
+        - 文档或项目治理
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 补充材料
+      description: 可附不含私人数据的草图、截图或示例。

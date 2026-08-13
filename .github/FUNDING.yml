@@ -1,0 +1,4 @@
+# GitHub 的 Sponsor 按钮会打开仓库内的加密货币赞助说明页。
+# 收款地址只需在 SPONSORSHIP.md 中维护；不要在这里填写私钥或助记词。
+custom:
+  - "https://github.com/Aloneswork/short-video-picker/blob/main/SPONSORSHIP.md"
