@@ -347,11 +347,7 @@ class PickerApi:
             else:
                 result_status = "failed"
             source_url = str(result.get("source_url") or result.get("page_url") or "")
-            input_url = str(
-                result.get("input_url")
-                or (result.get("profile_url") if result.get("origin_type") == "profile" else "")
-                or source_url
-            )
+            input_url = str(result.get("input_url") or source_url)
             rows.append(
                 (
                     timestamp,

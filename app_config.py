@@ -28,5 +28,4 @@ with (resource_dir() / "version.json").open(encoding="utf-8") as _handle:
 APP_VERSION = str(_CONFIG["version"])
 APP_BUILD = str(_CONFIG["build"])
 MAX_BATCH_LINKS = int(_CONFIG["max_batch_links"])
-MAX_BATCH_WORKS = int(_CONFIG["max_batch_works"])
 HISTORY_LIMIT = int(_CONFIG["history_limit"])
