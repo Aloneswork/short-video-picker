@@ -47,6 +47,18 @@ if /usr/bin/pgrep -f "$FINAL_APP/Contents/MacOS/视频资源整理" >/dev/null 2
   echo "构建已停止：请先退出正在运行的“视频资源整理”，再重新构建。" >&2
   exit 2
 fi
+# 测试、探针或 Finder 都可能留下缓存与残留；发布构建前先清理源码树，
+# 再由 check_source_clean.sh 作最终门禁。
+find "$ROOT" -path "$ROOT/.git" -prune -o \
+  -path "$ROOT/.venv" -prune -o -path "$ROOT/.venv-public.nosync" -prune -o \
+  -path "$ROOT/venv" -prune -o -path "$ROOT/vendor" -prune -o \
+  -path "$ROOT/dist.nosync" -prune -o -path "$ROOT/.build-staging.nosync" -prune -o \
+  -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null
+find "$ROOT" -path "$ROOT/.git" -prune -o \
+  -path "$ROOT/.venv" -prune -o -path "$ROOT/.venv-public.nosync" -prune -o \
+  -path "$ROOT/venv" -prune -o -path "$ROOT/vendor" -prune -o \
+  -path "$ROOT/dist.nosync" -prune -o -path "$ROOT/.build-staging.nosync" -prune -o \
+  -type f \( -name '*.pyc' -o -name '*.pyo' -o -name '.DS_Store' \) -delete 2>/dev/null
 "$ROOT/scripts/check_source_clean.sh"
 "$PYTHON_BIN" "$ROOT/scripts/sync_release_metadata.py" --check
 if [[ "$STAGING_ROOT" != "$ROOT/.build-staging.nosync" || -L "$STAGING_ROOT" ]]; then

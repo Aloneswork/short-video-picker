@@ -383,6 +383,13 @@ def parse_payload(
                             status="empty",
                             debug=profile.debug,
                         )
+                        # 让匿名渠道限制的原因直接可见，便于反馈定位。
+                        diagnostic_line = next(
+                            (line for line in (profile.debug or []) if line.startswith("主页诊断：")),
+                            "",
+                        )
+                        if diagnostic_line:
+                            error.error_hint = f"{error.error_hint}（{diagnostic_line}）"
                         error.author = profile_title
                         parsed_entries.append(
                             (

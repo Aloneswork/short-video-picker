@@ -585,7 +585,8 @@ class PublicBrowser:
                 work_payloads=selected_payloads,
             )
         diagnostic = (
-            f"主页诊断：URL匹配={int(page_matches)}，不可用提示={page.get('unavailable') or '无'}，"
+            f"主页诊断：URL匹配={int(page_matches)}，页面地址={str(current_url)[:160]}，"
+            f"不可用提示={page.get('unavailable') or '无'}，"
             f"公开作品链接={len(work_urls)}（作品网格={len(page.get('gridLinks') or [])}，"
             f"页面全局链接={len(page.get('allLinks') or [])}，"
             f"接口/服务端数据={len(work_payloads)}）。"
