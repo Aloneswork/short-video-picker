@@ -1,0 +1,1356 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>视频资源整理</title>
+  <link rel="icon" href="assets/app-icon-macos.png">
+  <style>
+    /* Linear 系极简：纯白底 + 冷调中性灰 + 单一靛蓝点缀 + 细线分割 */
+    :root {
+      --bg:#fbfbfc; --panel:#fff; --panel-2:#f4f4f6;
+      --ink:#18181b; --muted:#71717a; --faint:#a1a1aa;
+      --line:#e8e8ec; --line-strong:#d8d8de;
+      --accent:#4f46e5; --accent-hover:#4338ca; --accent-ink:#fff;
+      --accent-soft:rgba(79,70,229,.08); --accent-line:rgba(79,70,229,.32);
+      --ok:#15803d; --ok-bg:#eaf6ee;
+      --warn:#a16207; --warn-bg:#fdf6e3;
+      --err:#b91c1c; --err-bg:#fdeeee;
+      --radius:10px; --radius-sm:7px;
+      --shadow-bar:0 4px 20px rgba(24,24,27,.10), 0 1px 3px rgba(24,24,27,.06);
+      --shadow-card:0 1px 3px rgba(24,24,27,.08);
+      --shadow-card-hover:0 4px 12px rgba(24,24,27,.12);
+      --shadow-card-selected:0 8px 20px rgba(79,70,229,.20), 0 2px 6px rgba(24,24,27,.12);
+      --dur:.18s; --page-gutter:20px; --save-bar-height:58px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:#0e0e11; --panel:#17171a; --panel-2:#1f1f23;
+        --ink:#f4f4f5; --muted:#a1a1aa; --faint:#5b5b64;
+        --line:#26262b; --line-strong:#35353c;
+        --accent:#818cf8; --accent-hover:#6366f1; --accent-ink:#10101a;
+        --accent-soft:rgba(129,140,248,.12); --accent-line:rgba(129,140,248,.4);
+        --ok:#4ade80; --ok-bg:#14281b;
+        --warn:#fbbf24; --warn-bg:#2b2210;
+        --err:#f87171; --err-bg:#2e1616;
+        --shadow-bar:0 4px 20px rgba(0,0,0,.5), 0 1px 3px rgba(0,0,0,.4);
+        --shadow-card:0 1px 4px rgba(0,0,0,.35);
+        --shadow-card-hover:0 5px 14px rgba(0,0,0,.48);
+        --shadow-card-selected:0 8px 22px rgba(0,0,0,.55), 0 0 10px rgba(129,140,248,.18);
+      }
+    }
+    * { box-sizing:border-box; }
+    html { scrollbar-gutter:stable; }
+    body { margin:0; min-width:0; color:var(--ink); background:var(--bg); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif; -webkit-font-smoothing:antialiased; font-size:14px; }
+    button,textarea,input { font:inherit; color:inherit; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+      outline:2px solid var(--accent); outline-offset:2px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition-duration:.01ms !important; animation-duration:.01ms !important; }
+    }
+
+    /* ── 顶栏 ─────────────────────────── */
+    .topbar { height:52px; display:flex; align-items:center; justify-content:space-between; max-width:1200px; margin:0 auto; padding:0 20px; border-bottom:1px solid var(--line); background:var(--panel); position:sticky; top:0; z-index:30; }
+    .brand { display:flex; align-items:center; gap:9px; font-size:14.5px; font-weight:700; letter-spacing:-.2px; }
+    .brand img { width:24px; height:24px; border-radius:6px; }
+    .brand b { color:var(--accent); font-weight:700; }
+    .topbar-hint { font-size:12px; color:var(--faint); }
+    .topbar-actions { display:flex; align-items:center; justify-content:flex-end; gap:9px; min-width:0; }
+    .history-button { appearance:none; position:relative; flex:0 0 auto; width:32px; height:32px; display:grid; place-items:center; padding:0; border:1px solid transparent; border-radius:7px; color:var(--muted); background:transparent; cursor:pointer; transition:color var(--dur) ease, background var(--dur) ease, border-color var(--dur) ease; }
+    .history-button:hover, .history-button[aria-expanded="true"] { color:var(--accent); background:var(--accent-soft); border-color:var(--accent-line); }
+    .history-button svg { width:18px; height:18px; display:block; }
+    .diagnostics-button.has-warning { color:var(--warn); background:var(--warn-bg); border-color:rgba(180,83,9,.24); }
+    .diagnostics-button.has-error { color:var(--err); background:var(--err-bg); border-color:rgba(185,28,28,.24); }
+
+    .runtime-popover { position:fixed; z-index:61; top:46px; right:max(20px,calc((100vw - 1200px)/2 + 20px)); width:min(430px,calc(100vw - 24px)); max-height:min(590px,calc(100vh - 58px)); overflow:auto; border:1px solid var(--line-strong); border-radius:12px; background:var(--panel); box-shadow:0 18px 45px rgba(24,24,27,.18),0 3px 10px rgba(24,24,27,.09); }
+    .runtime-popover[hidden] { display:none; }
+    .runtime-summary { padding:0 13px 11px; color:var(--muted); font-size:11px; }
+    .runtime-list { display:grid; gap:1px; padding:0 5px 5px; }
+    .runtime-check { display:grid; grid-template-columns:9px minmax(0,1fr); gap:8px; padding:8px; border-top:1px solid var(--line); }
+    .runtime-check:first-child { border-top:0; }
+    .runtime-check-dot { width:8px; height:8px; margin-top:4px; border-radius:50%; background:var(--ok); }
+    .runtime-check.warning .runtime-check-dot { background:var(--warn); }
+    .runtime-check.error .runtime-check-dot { background:var(--err); }
+    .runtime-check strong { display:block; font-size:11.5px; }
+    .runtime-check span { display:block; margin-top:2px; color:var(--muted); font-size:10.5px; line-height:1.45; word-break:break-word; }
+    .runtime-actions { display:flex; justify-content:flex-end; gap:7px; padding:9px 13px; border-top:1px solid var(--line); background:var(--panel-2); }
+
+    /* ── 本地解析记录浮窗 ────────────────── */
+    .history-popover { position:fixed; z-index:60; top:46px; right:max(20px,calc((100vw - 1200px)/2 + 20px)); width:min(418px,calc(100vw - 24px)); max-height:min(570px,calc(100vh - 58px)); display:flex; flex-direction:column; overflow:hidden; border:1px solid var(--line-strong); border-radius:12px; background:var(--panel); box-shadow:0 18px 45px rgba(24,24,27,.18),0 3px 10px rgba(24,24,27,.09); }
+    .history-popover[hidden] { display:none; }
+    .history-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 13px 9px; }
+    .history-head-copy { min-width:0; }
+    .history-head strong { display:block; font-size:13px; }
+    .history-head span { display:block; margin-top:2px; color:var(--faint); font-size:10.5px; }
+    .history-close { appearance:none; flex:0 0 auto; width:27px; height:27px; display:grid; place-items:center; padding:0; border:0; border-radius:6px; color:var(--muted); background:transparent; cursor:pointer; font-size:18px; line-height:1; }
+    .history-close:hover { color:var(--ink); background:var(--panel-2); }
+    .history-controls { display:grid; gap:8px; padding:0 13px 11px; border-bottom:1px solid var(--line); }
+    .history-search-wrap { position:relative; }
+    .history-search-wrap svg { position:absolute; left:9px; top:50%; width:14px; height:14px; color:var(--faint); transform:translateY(-50%); pointer-events:none; }
+    .history-search { width:100%; height:32px; padding:0 10px 0 30px; border:1px solid var(--line); border-radius:7px; outline:0; background:var(--panel-2); font-size:12px; }
+    .history-search:focus { border-color:var(--accent-line); background:var(--panel); }
+    .history-filters { display:flex; align-items:center; gap:5px; }
+    .history-filter { appearance:none; min-height:25px; padding:0 9px; border:1px solid transparent; border-radius:6px; color:var(--muted); background:transparent; cursor:pointer; font-size:11px; font-weight:600; }
+    .history-filter:hover { color:var(--ink); background:var(--panel-2); }
+    .history-filter[aria-pressed="true"] { color:var(--accent); border-color:var(--accent-line); background:var(--accent-soft); }
+    .history-count { margin-left:auto; color:var(--faint); font-size:10.5px; font-variant-numeric:tabular-nums; }
+    .history-list { min-height:96px; overflow:auto; padding:5px; overscroll-behavior:contain; }
+    .history-item { display:grid; gap:5px; padding:9px; border-radius:8px; }
+    .history-item + .history-item { border-top:1px solid var(--line); border-radius:0; }
+    .history-item:hover { background:var(--panel-2); }
+    .history-item-top { display:flex; align-items:center; gap:7px; min-width:0; }
+    .history-time { color:var(--faint); font-size:10.5px; font-variant-numeric:tabular-nums; }
+    .history-result { flex:0 0 auto; padding:2px 6px; border-radius:999px; color:var(--ok); background:var(--ok-bg); font-size:10px; font-weight:700; }
+    .history-result.failed { color:var(--err); background:var(--err-bg); }
+    .history-result.cancelled { color:var(--warn); background:var(--warn-bg); }
+    .history-error-code { margin-left:auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--faint); font:600 9.5px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .history-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; font-weight:650; }
+    .history-meta { display:flex; align-items:center; gap:7px; min-width:0; color:var(--muted); font-size:10.5px; }
+    .history-author { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .history-resource-count { flex:0 0 auto; margin-left:auto; }
+    .history-url { appearance:none; width:100%; overflow:hidden; padding:0; border:0; color:var(--faint); background:transparent; text-align:left; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; font-size:10.5px; }
+    .history-url:hover { color:var(--accent); text-decoration:underline; }
+    .history-empty { display:grid; place-items:center; min-height:126px; padding:20px; color:var(--muted); text-align:center; font-size:12px; line-height:1.55; }
+    .history-footer { display:flex; align-items:center; gap:6px; padding:8px 13px; border-top:1px solid var(--line); color:var(--faint); background:var(--panel-2); font-size:10px; }
+    .history-footer span { margin-right:auto; }
+
+    main { max-width:1200px; margin:0 auto; padding:16px var(--page-gutter) calc(var(--save-bar-height) + 24px); }
+
+    /* ── 输入区 ───────────────────────── */
+    .composer { border:1px solid var(--line); border-radius:var(--radius); background:var(--panel); overflow:hidden; transition:opacity var(--dur) ease, border-color var(--dur) ease; }
+    .composer:focus-within { border-color:var(--accent-line); }
+    .composer-head { display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:12px 16px 0; }
+    .composer-title { font-size:13px; font-weight:650; letter-spacing:-.1px; }
+    .composer-meta { display:flex; align-items:center; justify-content:flex-end; gap:7px; flex-wrap:wrap; }
+    .composer-note { color:var(--faint); font-size:11px; }
+    .link-count { display:inline-flex; align-items:center; min-height:22px; padding:2px 8px; border:1px solid var(--line); border-radius:999px; color:var(--muted); background:var(--panel-2); font-size:10.5px; font-weight:650; font-variant-numeric:tabular-nums; transition:color var(--dur) ease, background var(--dur) ease, border-color var(--dur) ease; }
+    .link-count.has-links { color:var(--accent); background:var(--accent-soft); border-color:var(--accent-line); }
+    .link-count.over-limit { color:var(--err); background:var(--err-bg); border-color:var(--err); }
+    .composer textarea { display:block; width:100%; height:72px; min-height:54px; resize:vertical; border:0; outline:0; padding:8px 16px; background:transparent; font-size:13.5px; line-height:1.6; }
+    .composer textarea::placeholder { color:var(--faint); }
+    .composer-actions { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; border-top:1px solid var(--line); background:var(--panel-2); }
+    .parse-state { display:flex; align-items:center; gap:8px; min-width:0; flex:1; padding-left:8px; color:var(--muted); font-size:12px; min-height:20px; }
+    .parse-state[hidden] { display:none; }
+    .parse-state .dot { width:7px; height:7px; border-radius:50%; background:var(--accent); animation:pulse 1s ease-in-out infinite; }
+    .parse-copy { flex:0 1 auto; white-space:nowrap; font-variant-numeric:tabular-nums; }
+    .parse-progress { flex:1 1 160px; max-width:260px; height:4px; border-radius:99px; overflow:hidden; background:var(--line-strong); }
+    .parse-progress-fill { display:block; width:0; height:100%; border-radius:99px; background:var(--accent); transition:width var(--dur) ease; }
+    @keyframes pulse { 50% { opacity:.35; } }
+    .actions { display:flex; gap:8px; }
+
+    /* ── 按钮体系 ─────────────────────── */
+    .button { appearance:none; border:0; border-radius:var(--radius-sm); min-height:32px; padding:0 14px; cursor:pointer; font-size:13px; font-weight:600; letter-spacing:-.1px; transition:background var(--dur) ease, border-color var(--dur) ease, color var(--dur) ease, opacity var(--dur) ease, transform var(--dur) ease; }
+    .button:active { transform:scale(.98); }
+    .button:disabled { opacity:.4; cursor:not-allowed; transform:none; }
+    .button.primary { background:var(--accent); color:var(--accent-ink); }
+    .button.primary:hover:not(:disabled) { background:var(--accent-hover); }
+    .button.light { color:var(--ink); background:var(--panel); border:1px solid var(--line-strong); }
+    .button.light:hover:not(:disabled) { background:var(--panel-2); }
+    .button.danger { color:var(--err); background:var(--panel); border:1px solid rgba(185,28,28,.38); }
+    .button.danger:hover:not(:disabled) { color:#fff; background:var(--err); border-color:var(--err); }
+    .button.ghost { color:var(--muted); background:transparent; border:1px solid transparent; padding:0 9px; min-height:28px; font-size:12px; font-weight:550; border-radius:6px; }
+    .button.ghost:hover:not(:disabled) { color:var(--ink); background:var(--panel-2); }
+    .button.ghost[aria-pressed="true"] { color:var(--accent); background:var(--accent-soft); border-color:var(--accent-line); }
+
+    /* ── 工作区 ───────────────────────── */
+    .workspace { margin-top:18px; }
+    .workspace[hidden] { display:none; }
+    .workspace-head { display:flex; justify-content:space-between; align-items:flex-end; gap:14px; margin-bottom:12px; }
+    .workspace h2 { margin:0; font-size:16px; letter-spacing:-.3px; font-weight:700; }
+    .workspace-head p { margin:3px 0 0; color:var(--muted); font-size:11.5px; }
+    .summary { color:var(--muted); font-size:12.5px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+
+    /* ── 筛选工具行 ───────────────────── */
+    .toolbar { display:flex; align-items:center; gap:4px; flex-wrap:wrap; padding:6px; margin-bottom:14px; border:1px solid var(--line); border-radius:var(--radius); background:var(--panel); }
+    .toolbar .sep { width:1px; height:18px; background:var(--line-strong); margin:0 4px; flex:0 0 auto; }
+    .toolbar-label { font-size:12px; color:var(--faint); padding:0 4px 0 6px; }
+    .sel-count { margin-left:auto; font-size:12px; color:var(--muted); white-space:nowrap; padding-right:8px; font-variant-numeric:tabular-nums; }
+    .sel-count b { color:var(--ink); font-weight:650; }
+
+    /* ── 结果卡片（按链接分组）────────── */
+    .results { display:grid; gap:12px; }
+    .source { border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; background:var(--panel); }
+    .source-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 14px; border-bottom:1px solid var(--line); background:var(--panel-2); }
+    .source-title { min-width:0; display:flex; align-items:center; gap:9px; }
+    .source-index { flex:0 0 auto; width:20px; height:20px; border-radius:5px; background:var(--line); color:var(--muted); font-size:11px; font-weight:700; display:grid; place-items:center; font-variant-numeric:tabular-nums; }
+    .source-title-text { min-width:0; }
+    .source-title-text strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; font-weight:650; }
+    .source-title-text span { display:block; margin-top:2px; color:var(--faint); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .source-head-actions { display:flex; align-items:center; gap:8px; flex:0 0 auto; }
+    .tag { flex:0 0 auto; color:var(--ok); background:var(--ok-bg); border-radius:999px; padding:3px 9px; font-size:11px; font-weight:600; }
+    .tag.error { color:var(--err); background:var(--err-bg); }
+    .tag.partial { color:var(--warn); background:var(--warn-bg); }
+    .group-toggle { appearance:none; border:0; background:transparent; color:var(--muted); font-size:11.5px; cursor:pointer; padding:4px 7px; border-radius:6px; }
+    .group-toggle:hover { background:var(--line); color:var(--ink); }
+    /* 用户主页展开结果使用独立强调容器，避免与普通单链接结果混淆。 */
+    .profile-block { display:grid; gap:10px; padding:10px; border:2px solid var(--accent-line); border-radius:13px; background:linear-gradient(145deg,var(--accent-soft),var(--panel) 42%); box-shadow:0 7px 22px rgba(79,70,229,.10); }
+    .profile-origin { display:flex; align-items:center; gap:10px; min-width:0; padding:3px 4px 5px; }
+    .profile-origin-mark { flex:0 0 auto; display:grid; place-items:center; min-width:54px; height:28px; padding:0 9px; border-radius:8px; color:var(--accent-ink); background:var(--accent); font-size:11px; font-weight:750; letter-spacing:.2px; box-shadow:0 3px 9px rgba(79,70,229,.22); }
+    .profile-origin-copy { min-width:0; display:grid; gap:2px; }
+    .profile-origin-copy strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; }
+    .profile-origin-copy span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font-size:11px; }
+    .profile-origin-count { margin-left:auto; flex:0 0 auto; padding:3px 9px; border:1px solid var(--accent-line); border-radius:999px; color:var(--accent); background:var(--panel); font-size:11px; font-weight:650; font-variant-numeric:tabular-nums; }
+    .profile-result-list { display:grid; gap:10px; }
+    .profile-block .source { border-color:var(--accent-line); box-shadow:0 2px 8px rgba(79,70,229,.06); }
+    .source-title-text .origin-chip { display:inline-flex; align-items:center; margin:0 7px 0 0; padding:2px 6px; border-radius:5px; color:var(--accent); background:var(--accent-soft); font-size:10px; font-weight:750; vertical-align:1px; }
+    .source-title-text .story-chip { display:inline-flex; align-items:center; margin:0 7px 0 0; padding:2px 6px; border-radius:5px; color:#9a3412; background:#ffedd5; font-size:10px; font-weight:750; vertical-align:1px; }
+    @media (prefers-color-scheme: dark) { .source-title-text .story-chip { color:#fdba74; background:rgba(154,52,18,.3); } }
+
+    .media-groups { display:grid; }
+    .media-section + .media-section { border-top:1px solid var(--line); }
+    .media-section-head { display:flex; align-items:center; gap:7px; padding:10px 13px 0; }
+    .media-section-head strong { font-size:12px; letter-spacing:-.1px; }
+    .media-section-head span { color:var(--muted); background:var(--panel-2); border:1px solid var(--line); border-radius:999px; padding:1px 7px; font-size:10px; font-variant-numeric:tabular-nums; }
+    /* 自适应列宽：竖图一列窄、横图自动占更宽 */
+    .media-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; padding:10px 13px 13px; grid-auto-flow:dense; align-items:start; }
+    /* 筛选用 CSS 隐藏实现，避免重建 DOM 与重绑事件 */
+    #results.filter-video .media[data-kind="image"],
+    #results.filter-image .media[data-kind="video"],
+    #results.hide-saved .media.is-saved { display:none; }
+    .grid-empty { display:none; grid-column:1/-1; padding:18px; text-align:center; color:var(--muted); }
+    .media-section.is-empty .grid-empty { display:block; }
+
+    /* ── 素材卡片 ─────────────────────── */
+    .media { position:relative; align-self:start; width:100%; border:2px solid var(--line); border-radius:10px; overflow:hidden; background:var(--panel); cursor:pointer; box-shadow:var(--shadow-card); transform:translateY(0); transition:border-color var(--dur) ease, box-shadow var(--dur) ease, transform var(--dur) ease; }
+    .media:hover { border-color:var(--line-strong); box-shadow:var(--shadow-card-hover); transform:translateY(-1px); }
+    .media.checked { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft), var(--shadow-card-selected); transform:translateY(-2px); }
+    .media.is-saved { opacity:.55; }
+    .media.is-saved:hover { opacity:.8; }
+    /* 已存在的媒体必须醒目标红，且不沿用普通“已保存”的淡化效果。 */
+    .media.is-existing,
+    .media.is-existing:hover,
+    .media.is-existing.checked {
+      opacity:1;
+      border-color:var(--err);
+      box-shadow:0 0 0 3px var(--err-bg), var(--shadow-card-selected);
+    }
+    /* 横版缩略图卡片横跨两列 */
+    .media.landscape { grid-column:span 2; }
+    /* 两列宽度包含中间间距，8:5 可保证横卡高度不超过单列 3:4 竖卡。 */
+    .media.landscape .thumb-frame { aspect-ratio:8 / 5; }
+
+    /* 双层缩略图：横图固定 8:5、竖图固定 3:4；底层模糊铺满，上层绝对居中完整显示。 */
+    .thumb-frame { position:relative; display:grid; place-items:center; aspect-ratio:3 / 4; background:var(--panel-2); overflow:hidden; isolation:isolate; }
+    .thumb-blur { position:absolute; z-index:0; inset:-12%; width:124%; height:124%; object-fit:cover; object-position:center center; filter:blur(22px) saturate(1.15); transform:scale(1.1); opacity:.85; }
+    @media (prefers-color-scheme: dark) { .thumb-blur { opacity:.5; } }
+    .thumb-main { position:absolute; z-index:1; inset:0; width:100%; height:100%; object-fit:contain; object-position:center center; display:block; }
+    .thumb-empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--faint); font-size:22px; background:var(--panel-2); }
+    /* 无预览视频：深色播放占位 */
+    .video-empty { background:#17171c; color:#f4f4f5; }
+    .video-empty::after { content:""; width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.32); }
+    .video-empty::before { content:"▶"; position:absolute; z-index:1; font-size:14px; transform:translateX(1px); }
+
+    /* 角标 */
+    .badge { position:absolute; top:8px; left:8px; z-index:4; padding:2px 7px; border-radius:5px; font-size:10px; font-weight:700; letter-spacing:.3px; color:#fff; background:rgba(24,24,27,.72); backdrop-filter:blur(6px); }
+    .badge.video { background:rgba(79,70,229,.85); }
+    .badge.image { background:rgba(21,128,61,.82); }
+    .badge.live { background:rgba(217,119,87,.88); }
+    .item-index { position:absolute; top:8px; right:38px; z-index:4; padding:2px 6px; border-radius:5px; font-size:10px; font-weight:650; color:#fff; background:rgba(24,24,27,.5); backdrop-filter:blur(6px); font-variant-numeric:tabular-nums; }
+    /* 勾选 */
+    .check { position:absolute; top:8px; right:8px; width:22px; height:22px; border-radius:50%; background:#fff; border:1px solid var(--line-strong); display:grid; place-items:center; z-index:5; box-shadow:0 1px 3px rgba(24,24,27,.16); }
+    .check input { appearance:none; width:100%; height:100%; margin:0; cursor:pointer; border-radius:50%; }
+    .check input:checked { background:var(--accent); border-color:var(--accent); }
+    .check input:checked::after { content:"✓"; color:#fff; display:block; text-align:center; font-size:12px; line-height:20px; font-weight:700; }
+    /* 单项保存按钮 */
+    .save-one { position:absolute; right:8px; bottom:8px; z-index:7; appearance:none; min-height:26px; padding:0 10px; border:0; border-radius:6px; background:rgba(255,255,255,.88); color:#18181b; cursor:pointer; font-size:11px; font-weight:650; backdrop-filter:blur(6px); box-shadow:0 1px 4px rgba(24,24,27,.18); opacity:0; transform:translateY(2px); transition:opacity var(--dur) ease, transform var(--dur) ease, background var(--dur) ease; }
+    .media:hover .save-one, .media:focus-within .save-one { opacity:1; transform:translateY(0); }
+    .save-one:hover { background:#fff; }
+    .save-one:disabled { cursor:wait; opacity:.85 !important; }
+    .save-one.done { color:var(--ok); cursor:default; opacity:1 !important; transform:none; }
+    /* 保存状态标记 */
+    .save-state { position:absolute; left:8px; bottom:8px; z-index:4; padding:2px 8px; border-radius:5px; background:rgba(24,24,27,.7); color:#fff; font-size:10.5px; font-weight:650; backdrop-filter:blur(6px); }
+    .save-state:empty { display:none; }
+    .save-state.saved { background:rgba(21,128,61,.88); }
+    .save-state.existing { background:rgba(185,28,28,.9); }
+    .save-state.failed { background:rgba(185,28,28,.88); }
+    .quality-select { position:absolute; z-index:6; left:8px; bottom:8px; width:calc(100% - 82px); height:28px; padding:0 24px 0 8px; border:1px solid rgba(255,255,255,.52); border-radius:6px; color:#18181b; background:rgba(255,255,255,.9); font-size:10.5px; font-weight:600; outline:0; backdrop-filter:blur(8px); }
+    .quality-select ~ .save-one { opacity:1; transform:none; }
+    .quality-select + .save-state { bottom:43px; }
+
+    /* ── 错误卡片 ─────────────────────── */
+    .error-box { margin:10px; padding:12px 13px; border-radius:8px; background:var(--err-bg); color:var(--err); font-size:12px; line-height:1.55; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .error-copy { min-width:0; flex:1; display:grid; gap:4px; }
+    .error-meta { min-width:0; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .error-code { flex:0 0 auto; padding:2px 7px; border:1px solid rgba(185,28,28,.18); border-radius:5px; background:rgba(255,255,255,.62); color:var(--err); font:650 10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.01em; }
+    .error-box .error-text { min-width:0; flex:1; font-weight:600; }
+    .error-hint { color:var(--muted); font-size:11px; }
+    .error-actions { display:flex; gap:6px; flex:0 0 auto; }
+    .error-actions .button { min-height:26px; font-size:11.5px; padding:0 9px; }
+    .source.is-retrying .error-box { box-shadow:inset 0 0 0 1px var(--accent-line); }
+    .source.is-retrying .error-code { color:var(--accent); border-color:var(--accent-line); }
+
+    /* ── 窗口固定保存栏 ────────────────── */
+    .save-bar { position:fixed; left:0; right:0; bottom:0; z-index:40; width:100%; display:flex; align-items:center; gap:9px; padding:10px max(var(--page-gutter),calc((100vw - 1200px)/2 + var(--page-gutter))); margin:0; border:0; border-top:1px solid var(--line-strong); border-radius:0; background:var(--panel); box-shadow:none; }
+    .save-bar .button { flex:0 0 auto; white-space:nowrap; }
+    .save-bar .counter { flex:0 0 auto; }
+    .save-dir { flex:1; min-width:0; border:1px solid var(--line); border-radius:6px; outline:0; color:var(--muted); background:var(--panel-2); padding:6px 9px; font-size:12.5px; }
+    .save-dir:focus { border-color:var(--accent-line); background:var(--panel); }
+    .counter { color:var(--muted); font-size:12.5px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+    .counter b { color:var(--ink); }
+    .save-progress { display:none; align-items:center; gap:8px; min-width:0; flex:0 1 260px; }
+    .save-progress.visible { display:flex; }
+    .progress-track { flex:1; height:4px; border-radius:99px; background:var(--line); overflow:hidden; }
+    .progress-fill { height:100%; width:0%; border-radius:99px; background:var(--accent); transition:width var(--dur) ease; }
+    .save-status { flex:0 1 420px; max-width:min(420px,42vw); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font-size:11.5px; }
+    .save-status.working { color:var(--accent); font-weight:600; }
+    .save-status.ok { color:var(--ok); font-weight:600; }
+    .save-status.err { color:var(--err); font-weight:600; }
+    .duplicate-details { margin-top:9px; padding:8px 11px; border:1px solid rgba(185,28,28,.28); border-radius:var(--radius-sm); background:var(--err-bg); color:var(--err); font-size:11.5px; }
+    .duplicate-details[hidden] { display:none; }
+    .duplicate-details summary { cursor:pointer; font-weight:650; }
+    .duplicate-list { display:grid; gap:5px; margin:8px 0 1px; padding-left:18px; color:var(--muted); }
+    .duplicate-list strong { color:var(--ink); }
+    .duplicate-list code { word-break:break-all; font:10.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .failure-details { margin-top:9px; padding:8px 11px; border:1px solid rgba(185,28,28,.28); border-radius:var(--radius-sm); background:var(--err-bg); color:var(--err); font-size:11.5px; }
+    .failure-details[hidden] { display:none; }
+    .failure-details summary { cursor:pointer; font-weight:650; }
+    .failure-list { display:grid; gap:5px; margin:8px 0 1px; padding-left:18px; color:var(--muted); }
+    .failure-list strong { color:var(--ink); }
+    .retry-failed { margin-top:8px; }
+
+    .empty { padding:38px 20px; text-align:center; color:var(--muted); border:1px dashed var(--line-strong); border-radius:var(--radius); background:var(--panel); font-size:13px; }
+
+    .toast { position:fixed; left:50%; bottom:calc(var(--save-bar-height) + 12px); transform:translate(-50%, 14px); opacity:0; pointer-events:none; background:#18181b; color:#fafafa; padding:10px 15px; border-radius:8px; font-size:13px; box-shadow:0 10px 24px rgba(0,0,0,.24); transition:.2s ease; max-width:640px; text-align:center; z-index:50; }
+    @media (prefers-color-scheme: dark) { .toast { background:#f4f4f5; color:#18181b; } }
+    .toast.show { transform:translate(-50%, 0); opacity:1; }
+    .loading { opacity:.6; pointer-events:none; }
+
+    /* ── 回到顶部悬浮按钮 ─────────────── */
+    /* 放在保存栏上方，避免遮挡「保存已选资源」；无滚动或未滚动时隐藏。 */
+    .to-top { position:fixed; right:20px; bottom:calc(var(--save-bar-height) + 12px); z-index:40; width:40px; height:40px; display:grid; place-items:center; padding:0; border:1px solid var(--line-strong); border-radius:50%; background:var(--panel); color:var(--muted); cursor:pointer; box-shadow:var(--shadow-bar); opacity:0; transform:translateY(8px); pointer-events:none; transition:opacity var(--dur) ease, transform var(--dur) ease, color var(--dur) ease, border-color var(--dur) ease; }
+    .to-top.show { opacity:1; transform:translateY(0); pointer-events:auto; }
+    .to-top:hover { color:var(--accent); border-color:var(--accent-line); background:var(--panel-2); }
+    .to-top:active { transform:scale(.94); }
+    .to-top svg { width:18px; height:18px; display:block; }
+    @media (max-width:680px) { .to-top { right:12px; width:38px; height:38px; } }
+
+    /* ── 响应式 ───────────────────────── */
+    @media (max-width:900px) {
+      :root { --page-gutter:16px; }
+      .topbar,main { padding-left:16px; padding-right:16px; }
+    }
+    @media (max-width:680px) {
+      :root { --page-gutter:12px; }
+      .topbar { height:46px; padding-left:12px; padding-right:12px; }
+      .topbar-hint { display:none; }
+      .topbar-actions { gap:4px; }
+      .history-popover { top:42px; right:12px; width:calc(100vw - 24px); max-height:calc(100vh - 50px); }
+      .brand { font-size:13.5px; }
+      main { padding:10px 12px calc(var(--save-bar-height) + 16px); }
+      .composer textarea { height:62px; min-height:50px; font-size:13px; }
+      .composer-head { align-items:flex-start; }
+      .composer-meta { gap:5px; }
+      .composer-note { display:none; }
+      .composer-actions { flex-direction:column; align-items:stretch; gap:6px; }
+      .actions { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); width:100%; }
+      .actions .button { min-width:0; padding:0 8px; }
+      .workspace-head { flex-direction:column; align-items:flex-start; gap:3px; }
+      .summary { white-space:normal; }
+      .media-grid { grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:8px; }
+      .save-bar { flex-wrap:wrap; }
+      .save-dir { flex:1 1 calc(100% - 108px); }
+      .counter { margin-left:auto; }
+      .save-progress { order:5; flex:1 0 100%; }
+      .save-status { order:6; flex:1 0 100%; max-width:none; }
+      .error-box { flex-direction:column; align-items:flex-start; }
+      .profile-origin { align-items:flex-start; flex-wrap:wrap; }
+      .profile-origin-count { margin-left:64px; }
+      .toast { width:calc(100% - 24px); }
+    }
+    @media (max-height:460px) {
+      .topbar { height:42px; }
+      .topbar-hint { display:none; }
+      main { padding-top:8px; padding-bottom:calc(var(--save-bar-height) + 12px); }
+      .composer-head { padding-top:8px; }
+      .composer textarea { height:48px; min-height:42px; }
+      .composer-actions { padding-top:6px; padding-bottom:6px; }
+      .button { min-height:30px; }
+      .workspace { margin-top:10px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><img src="assets/app-icon-macos.png" alt=""><span>视频<b>整理</b>器</span></div>
+    <div class="topbar-actions">
+      <button class="history-button" id="history-button" type="button" aria-label="查看解析记录" aria-expanded="false" aria-controls="history-popover" title="解析记录">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/></svg>
+      </button>
+      <button class="history-button diagnostics-button" id="diagnostics-button" type="button" aria-label="查看运行诊断" aria-expanded="false" aria-controls="runtime-popover" title="运行诊断">●</button>
+      <span class="topbar-hint" id="runtime-version">抖音素材批量解析 · 本地保存</span>
+    </div>
+  </header>
+  <aside class="history-popover" id="history-popover" role="dialog" aria-label="解析记录" hidden>
+    <div class="history-head">
+      <div class="history-head-copy"><strong>解析记录</strong><span id="history-limit-copy">保存在本机</span></div>
+      <button class="history-close" id="history-close" type="button" aria-label="关闭解析记录">×</button>
+    </div>
+    <div class="history-controls">
+      <label class="history-search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+        <input class="history-search" id="history-search" type="search" autocomplete="off" placeholder="搜索文案或作者" aria-label="搜索解析文案或作者">
+      </label>
+      <div class="history-filters" role="group" aria-label="按解析结果筛选">
+        <button class="history-filter" type="button" data-history-filter="all" aria-pressed="true">全部</button>
+        <button class="history-filter" type="button" data-history-filter="success" aria-pressed="false">成功</button>
+        <button class="history-filter" type="button" data-history-filter="failed" aria-pressed="false">失败</button>
+        <span class="history-count" id="history-count"></span>
+      </div>
+    </div>
+    <div class="history-list" id="history-list" role="list"></div>
+    <div class="history-footer"><span>点击原始链接可复制</span><button class="button ghost" id="export-history-csv" type="button">导出 CSV</button><button class="button ghost" id="export-history-txt" type="button">导出 TXT</button></div>
+  </aside>
+  <aside class="runtime-popover" id="runtime-popover" role="dialog" aria-label="运行诊断" hidden>
+    <div class="history-head"><div class="history-head-copy"><strong>运行诊断</strong><span>仅检查本机组件，不上传任何数据</span></div><button class="history-close" id="runtime-close" type="button" aria-label="关闭运行诊断">×</button></div>
+    <div class="runtime-summary" id="runtime-summary"></div>
+    <div class="runtime-list" id="runtime-list"></div>
+    <div class="runtime-actions"><button class="button light" id="refresh-diagnostics" type="button">重新检查</button><button class="button primary" id="export-diagnostics" type="button">导出诊断包</button></div>
+  </aside>
+  <main>
+    <section class="hero" id="hero" hidden aria-hidden="true"></section>
+    <section class="composer" id="composer" aria-label="链接输入区">
+      <div class="composer-head">
+        <span class="composer-title">粘贴抖音分享内容</span>
+        <span class="composer-meta">
+          <span class="link-count" id="link-count" role="status" aria-live="polite">0 条链接</span>
+          <span class="composer-note" id="batch-note">无需登录</span>
+        </span>
+      </div>
+      <textarea id="links" placeholder="粘贴抖音作品或用户主页链接。每行一个，或直接粘贴整段分享内容。" aria-label="抖音分享链接输入"></textarea>
+      <div class="composer-actions">
+        <span class="parse-state" id="parse-state" role="status" aria-live="polite" hidden>
+          <span class="dot" aria-hidden="true"></span>
+          <span class="parse-copy" id="parse-copy">正在准备解析…</span>
+          <span class="parse-progress" aria-hidden="true"><span class="parse-progress-fill" id="parse-progress-fill"></span></span>
+        </span>
+        <div class="actions">
+          <button class="button light" id="clear">清空</button>
+          <button class="button light" id="paste">粘贴</button>
+          <button class="button danger" id="cancel-parse" hidden>终止解析</button>
+          <button class="button primary" id="parse">解析链接</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="workspace" id="workspace" hidden aria-label="解析结果区">
+      <div class="workspace-head">
+        <div>
+          <h2>解析结果</h2>
+          <p>Live 图归入视频组，纯静态图片单独归类。点击卡片即可选中。</p>
+        </div>
+        <span class="summary" id="summary"></span>
+      </div>
+
+      <div class="toolbar" role="toolbar" aria-label="批量选择工具">
+        <span class="toolbar-label">选择</span>
+        <button class="button ghost" id="sel-all">全选</button>
+        <button class="button ghost" id="sel-none">取消全选</button>
+        <button class="button ghost" id="sel-invert">反选</button>
+        <span class="sep" aria-hidden="true"></span>
+        <button class="button ghost" id="filter-video" aria-pressed="false">只看视频</button>
+        <button class="button ghost" id="filter-image" aria-pressed="false">只看图片</button>
+        <button class="button ghost" id="hide-saved" aria-pressed="false">隐藏已保存</button>
+        <span class="sel-count" id="sel-count"></span>
+      </div>
+
+      <div class="results" id="results"></div>
+
+      <div class="save-bar" aria-label="保存操作栏">
+        <input id="folder" class="save-dir" aria-label="保存位置" readonly>
+        <button class="button light" id="choose">更改位置</button>
+        <span class="counter" id="counter">已选 <b>0</b> 项</span>
+        <span class="save-progress" id="save-progress"><span class="progress-track"><span class="progress-fill" id="progress-fill"></span></span></span>
+        <span class="save-status" id="download-status" role="status" aria-live="polite" hidden></span>
+        <button class="button primary" id="download" disabled title="请先勾选要保存的资源">保存已选资源</button>
+      </div>
+      <details class="duplicate-details" id="duplicate-details" hidden>
+        <summary id="duplicate-summary">真正重复的内容</summary>
+        <ol class="duplicate-list" id="duplicate-list"></ol>
+      </details>
+      <details class="failure-details" id="failure-details" hidden>
+        <summary id="failure-summary">保存失败的项目</summary>
+        <ol class="failure-list" id="failure-list"></ol>
+        <button class="button danger retry-failed" id="retry-failed" type="button">重试失败项</button>
+      </details>
+    </section>
+  </main>
+  <button class="to-top" id="to-top" type="button" aria-label="回到顶部" title="回到顶部">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6"/><path d="m6 12 6-6 6 6"/></svg>
+  </button>
+  <div class="toast" id="toast" role="alert"></div>
+  <script>
+    let state = {
+      results: [],
+      saveInProgress: false,
+      parseInProgress: false,
+      parseJobId: '',
+      retryGroup: null,
+      viewGeneration: 0,
+      filter: 'all',      // all | video | image
+      hideSaved: false,
+      historyFilter: 'all',
+      maxBatchLinks: 1,
+      historyLimit: 1,
+      lastDownloadJobId: '',
+    };
+    const $ = (id) => document.getElementById(id);
+    const escapeHtml = (value='') => String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    const api = () => window.pywebview && window.pywebview.api;
+    let resultPresence=null;
+    let historyLoadSequence=0;
+    let historySearchTimer=0;
+
+    function syncResultPresence(force=false) {
+      const hasResults=state.results.length>0;
+      if (!force && resultPresence===hasResults) return;
+      resultPresence=hasResults;
+      const bridge=api();
+      if (!bridge || !bridge.set_result_presence) return;
+      Promise.resolve(bridge.set_result_presence(hasResults)).catch(()=>{ resultPresence=null; });
+    }
+
+    function extractInputLinks(text='') {
+      const matches=String(text).match(/https?:\/\/[^\s"'<>]+/g)||[];
+      return [...new Set(matches.map(raw=>raw.trim().replace(/[).,;，。]+$/g,'')).filter(Boolean))];
+    }
+    function updateLinkCount() {
+      const count=extractInputLinks($('links').value).length;
+      const node=$('link-count');
+      const limit=state.maxBatchLinks;
+      node.classList.toggle('has-links', count>0 && count<=limit);
+      node.classList.toggle('over-limit', count>limit);
+      node.textContent=count>limit ? `已识别 ${count} 条 · 仅解析前 ${limit} 条` : (count ? `已识别 ${count} 条` : '0 条链接');
+      node.title=count>limit ? `超出单批上限 ${count-limit} 条` : '';
+    }
+
+    function toast(message) { const node=$('toast'); node.textContent=message; node.classList.add('show'); clearTimeout(window.toastTimer); window.toastTimer=setTimeout(()=>node.classList.remove('show'), 3600); }
+
+    /* ── 本地解析记录 ─────────────────────── */
+    function formatHistoryTime(value='') {
+      const date=new Date(value);
+      if (Number.isNaN(date.getTime())) return value || '时间未知';
+      const pad=number=>String(number).padStart(2,'0');
+      return `${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+    function renderParseHistory(records=[],total=0) {
+      const list=$('history-list');
+      $('history-count').textContent=records.length===total ? `${total} 条` : `${records.length}/${total} 条`;
+      if (!records.length) {
+        const hasQuery=$('history-search').value.trim() || state.historyFilter!=='all';
+        list.innerHTML=`<div class="history-empty">${hasQuery?'没有符合当前搜索或筛选条件的记录。':'还没有解析记录。<br>完成一次解析后会自动保存在这里。'}</div>`;
+        return;
+      }
+      list.innerHTML=records.map(record=>{
+        const status=record.result_status==='success'?'success':(record.result_status==='cancelled'?'cancelled':'failed');
+        const statusLabel=status==='success'?'成功':(status==='cancelled'?'已终止':'失败');
+        const author=record.author ? `作者：${escapeHtml(record.author)}` : '作者未返回';
+        const resourceText=status==='success' ? `${record.item_count||0} 个资源` : (record.content_label||'');
+        const inputUrl=record.input_url||record.source_url||'';
+        return `<article class="history-item" role="listitem">
+          <div class="history-item-top"><span class="history-time">${escapeHtml(formatHistoryTime(record.parsed_at))}</span><span class="history-result ${status}">${statusLabel}</span>${record.error_code?`<span class="history-error-code">${escapeHtml(record.error_code)}</span>`:''}</div>
+          <div class="history-title" title="${escapeHtml(record.title||'')}">${escapeHtml(record.title||'未填写文案')}</div>
+          <div class="history-meta"><span class="history-author">${author}</span>${resourceText?`<span class="history-resource-count">${escapeHtml(resourceText)}</span>`:''}</div>
+          <button class="history-url" type="button" data-history-url="${escapeHtml(inputUrl)}" title="点击复制解析前链接">${escapeHtml(inputUrl||'原始链接未记录')}</button>
+        </article>`;
+      }).join('');
+    }
+    async function loadParseHistory() {
+      const bridge=api();
+      if (!bridge || !bridge.get_parse_history) return;
+      const sequence=++historyLoadSequence;
+      $('history-list').innerHTML='<div class="history-empty">正在读取本地解析记录…</div>';
+      try {
+        const result=await bridge.get_parse_history($('history-search').value.trim(),state.historyFilter);
+        if (sequence!==historyLoadSequence) return;
+        if (!result.ok) throw new Error(result.message);
+        renderParseHistory(result.records||[],result.total||0);
+      } catch(error) {
+        if (sequence!==historyLoadSequence) return;
+        $('history-count').textContent='';
+        $('history-list').innerHTML=`<div class="history-empty">${escapeHtml(error.message||'解析记录读取失败。')}</div>`;
+      }
+    }
+    function openParseHistory() {
+      $('history-popover').hidden=false;
+      $('history-button').setAttribute('aria-expanded','true');
+      loadParseHistory();
+      requestAnimationFrame(()=>$('history-search').focus());
+    }
+    function closeParseHistory() {
+      $('history-popover').hidden=true;
+      $('history-button').setAttribute('aria-expanded','false');
+      historyLoadSequence+=1;
+    }
+
+    function renderDiagnostics(runtime={}) {
+      const checks=runtime.checks||[];
+      const errors=Number(runtime.error_count)||0, warnings=Number(runtime.warning_count)||0;
+      $('runtime-summary').textContent=errors
+        ? `${errors} 项错误 · ${warnings} 项提醒。正式分发或关键功能可能不可用。`
+        : (warnings ? `${warnings} 项提醒；核心运行时正常。` : '运行环境检查通过。');
+      $('runtime-list').innerHTML=checks.map(check=>`<div class="runtime-check ${escapeHtml(check.level||'ok')}"><span class="runtime-check-dot" aria-hidden="true"></span><div><strong>${escapeHtml(check.name||'组件')}</strong><span>${escapeHtml(check.detail||'')}${check.guidance?`<br>${escapeHtml(check.guidance)}`:''}</span></div></div>`).join('');
+      const button=$('diagnostics-button');
+      button.classList.toggle('has-error',errors>0);
+      button.classList.toggle('has-warning',!errors&&warnings>0);
+      button.textContent=errors?'!':(warnings?'•':'✓');
+      button.title=errors?'运行环境存在错误':(warnings?'运行环境有提醒':'运行环境正常');
+    }
+    async function loadDiagnostics() {
+      $('runtime-summary').textContent='正在检查运行环境…';
+      $('runtime-list').innerHTML='';
+      try { renderDiagnostics(await api().get_runtime_diagnostics()); }
+      catch(error) { $('runtime-summary').textContent=error.message||'运行环境检查失败。'; }
+    }
+    function openDiagnostics() {
+      closeParseHistory();
+      $('runtime-popover').hidden=false;
+      $('diagnostics-button').setAttribute('aria-expanded','true');
+      loadDiagnostics();
+    }
+    function closeDiagnostics() {
+      $('runtime-popover').hidden=true;
+      $('diagnostics-button').setAttribute('aria-expanded','false');
+    }
+
+    function setBusy(value, total=0) {
+      state.parseInProgress=value;
+      $('parse').textContent = value ? '正在解析…' : '解析链接';
+      $('parse').disabled = value;
+      $('clear').disabled=value;
+      $('paste').disabled=value;
+      $('links').disabled=value;
+      $('cancel-parse').hidden=!value;
+      $('cancel-parse').disabled=false;
+      $('cancel-parse').textContent='终止解析';
+      $('parse-state').hidden=!value;
+      if (value) setParseProgress(0,total,'正在准备解析…');
+    }
+    function setParseProgress(completed,total,current='') {
+      const pct=total>0?Math.round(completed/total*100):0;
+      $('parse-progress-fill').style.width=pct+'%';
+      const next=Math.min(completed+1,total||1);
+      $('parse-copy').textContent=current || `正在解析 ${next}/${total||'…'}`;
+    }
+
+    /* ── 选择与统计 ─────────────────────── */
+    function allItems() {
+      const list=[];
+      state.results.forEach((group,g)=>group.items.forEach((item,i)=>list.push({group:g,index:i,item})));
+      return list;
+    }
+    // 从卡片的 data 属性取回其状态对象，供事件委托使用。
+    function itemAt(node) {
+      const group = state.results[+node.dataset.group];
+      const item = group && group.items[+node.dataset.item];
+      return item ? {group:+node.dataset.group, index:+node.dataset.item, item} : null;
+    }
+    // 通过容器 class 让 CSS 承担筛选隐藏，再逐段落标记空态。零 DOM 重建。
+    function applyVisibility() {
+      const box=$('results');
+      box.classList.toggle('filter-video', state.filter==='video');
+      box.classList.toggle('filter-image', state.filter==='image');
+      box.classList.toggle('hide-saved', state.hideSaved);
+      box.querySelectorAll('.media-section').forEach(section=>{
+        const cards=section.querySelectorAll('.media');
+        const anyVisible=Array.from(cards).some(card=>card.offsetParent!==null);
+        section.classList.toggle('is-empty', cards.length>0 && !anyVisible);
+      });
+    }
+    function visibleEntry(entry) {
+      const kind = entry.item.kind;
+      if (state.filter==='video' && kind!=='video') return false;
+      if (state.filter==='image' && kind!=='image') return false;
+      if (state.hideSaved) {
+        const s = entry.item.save_state;
+        if (s==='saved' || s==='existing') return false;
+      }
+      return true;
+    }
+    function selectedValues() { return allItems().filter(e=>e.item.selected!==false).map(e=>e.item); }
+    function updateCounter() {
+      const total = allItems().length;
+      const selected = selectedValues().length;
+      $('counter').innerHTML = `已选 <b>${selected}</b> 项`;
+      $('sel-count').innerHTML = total ? `共 ${total} 项 · 已选 <b>${selected}</b>` : '';
+      const btn=$('download');
+      btn.disabled = state.saveInProgress || selected===0;
+      btn.title = selected===0 ? '请先勾选要保存的资源' : `保存已选的 ${selected} 项资源`;
+    }
+    // 从状态同步全部卡片的选中态（仅批量操作时调用，逐项勾选走 O(1) 路径）
+    function syncSelectionUI() {
+      document.querySelectorAll('#results .media').forEach(card=>{
+        const ref = itemAt(card);
+        if (!ref) return;
+        const selected = ref.item.selected!==false;
+        const check = card.querySelector('.resource-check');
+        if (check) check.checked = selected;
+        card.classList.toggle('checked', selected);
+        card.setAttribute('aria-checked', selected);
+      });
+    }
+    function setSelection(entries, value) {
+      entries.forEach(e=>{ e.item.selected=value; });
+      syncSelectionUI();
+      updateCounter();
+    }
+    function syncFilterButtons() {
+      $('filter-video').setAttribute('aria-pressed', state.filter==='video');
+      $('filter-image').setAttribute('aria-pressed', state.filter==='image');
+      $('hide-saved').setAttribute('aria-pressed', state.hideSaved);
+    }
+
+    /* ── 保存状态反馈 ───────────────────── */
+    function setDownloadStatus(text='', tone='') {
+      const node=$('download-status');
+      node.hidden=!text;
+      node.textContent=text;
+      node.title=text;
+      node.className='save-status' + (tone?` ${tone}`:'');
+      $('save-progress').classList.toggle('visible', tone==='working');
+    }
+    function setProgress(completed, total) {
+      const pct = total>0 ? Math.round(completed/total*100) : 0;
+      $('progress-fill').style.width = pct + '%';
+    }
+
+    /* ── 卡片渲染 ───────────────────────── */
+    function badgeFor(item) {
+      if (item.kind==='image') return '<span class="badge image">图片</span>';
+      const isLive = item.is_live || item.live_photo || (item.media_type==='live');
+      return isLive ? '<span class="badge live">Live 图</span>' : '<span class="badge video">视频</span>';
+    }
+    function sizeThumbnail(image) {
+      if (!image.naturalWidth || !image.naturalHeight) return;
+      const card=image.closest('.media');
+      if (!card) return;
+      const ratio=image.naturalWidth/image.naturalHeight;
+      if (ratio>1.15) {
+        card.classList.add('landscape');
+      } else {
+        card.classList.remove('landscape');
+      }
+    }
+    function mediaCard(item, group, index) {
+      const image = item.kind==='image';
+      const preview = item.preview_url || (image ? item.media_url : '');
+      // 双层缩略图：横图 8:5、竖图 3:4；底层模糊铺底，上层 contain 居中完整呈现。
+      let thumbInner;
+      if (preview) {
+        const src = escapeHtml(preview);
+        thumbInner =
+          `<img class="thumb-blur" src="${src}" alt="" aria-hidden="true" onerror="this.remove()">` +
+          `<img class="thumb-main" src="${src}" alt="${image?'图片':'视频首帧'}预览" loading="lazy" ` +
+          `onload="sizeThumbnail(this)" ` +
+          `onerror="this.outerHTML='<span class=thumb-empty>🖼</span>'">`;
+      } else {
+        thumbInner = image ? '<span class="thumb-empty">🖼</span>' : '';
+      }
+      const frameClass = preview ? 'thumb-frame' : (image ? 'thumb-frame' : 'thumb-frame video-empty');
+      const selected = item.selected!==false;
+      const status = item.save_state||'';
+      const saved = status==='saved', existing = status==='existing';
+      const stateClass = `${saved||existing?' is-saved':''}${existing?' is-existing':''}`;
+      const statusText = saved?'已保存':existing?'文件已存在':status==='failed'?'保存失败':'';
+      const action = saved||existing ? '' : `<button class="save-one" data-group="${group}" data-item="${index}" ${state.saveInProgress?'disabled':''}>保存</button>`;
+      const options=Array.isArray(item.quality_options)?item.quality_options:[];
+      const quality=options.length>1
+        ? `<select class="quality-select" data-group="${group}" data-item="${index}" aria-label="选择素材 ${index+1} 清晰度">${options.map(option=>`<option value="${escapeHtml(option.url||'')}" ${option.url===item.media_url?'selected':''}>${escapeHtml(option.label||'清晰度')}</option>`).join('')}</select>`
+        : '';
+      return `<article class="media ${selected?'checked':''}${stateClass}" data-group="${group}" data-item="${index}" data-kind="${escapeHtml(item.kind)}" tabindex="0" role="checkbox" aria-checked="${selected}" aria-label="素材 ${index+1}">
+        ${badgeFor(item)}<span class="item-index">#${index+1}</span>
+        <span class="check"><input class="resource-check" data-group="${group}" data-item="${index}" type="checkbox" ${selected?'checked':''} aria-label="选择素材 ${index+1}"></span>
+        <div class="${frameClass}">${thumbInner}${quality}<span class="save-state ${status}">${statusText}</span>${action}</div>
+      </article>`;
+    }
+    function mediaSection(result, group, kind, label) {
+      const entries = result.items.map((item,index)=>({item,index})).filter(e=>e.item.kind===kind);
+      if (!entries.length) return '';
+      // 渲染全部卡片，交由 CSS 处理筛选隐藏；空态占位常驻，由 applyVisibility 切换。
+      const grid = entries.map(e=>mediaCard(e.item,group,e.index)).join('')
+        + '<div class="grid-empty">当前筛选条件下无内容。</div>';
+      return `<section class="media-section" data-kind="${kind}"><div class="media-section-head"><strong>${label}</strong><span>${entries.length} 项</span></div><div class="media-grid">${grid}</div></section>`;
+    }
+    function classifiedMedia(result, group) {
+      return `<div class="media-groups">${mediaSection(result,group,'video','视频 / Live 图')}${mediaSection(result,group,'image','图片')}</div>`;
+    }
+
+    function applySaveResults(results) {
+      results.forEach(result=>{
+        state.results.forEach(group=>group.items.forEach(item=>{
+          const sameMedia = result.media_url
+            ? item.media_url===result.media_url
+            : item.suggested_name===result.name;
+          if (sameMedia) item.save_state=result.status;
+        }));
+      });
+    }
+    function finishMessage(status) {
+      const total=Number(status.total)||0;
+      const completed=Number(status.completed)||0;
+      const saved=Number(status.saved)||0;
+      const existing=Number(status.existing)||0;
+      const failed=Number(status.failed)||0;
+      const pieces=[`已处理 ${completed}/${total}`];
+      // Report only result categories that actually occurred in this run.
+      // This keeps the fixed bar concise and makes every displayed number
+      // useful: saved first, then true duplicates, then failures.
+      if (saved) pieces.push(`新保存 ${saved} 项`);
+      if (existing) pieces.push(`内容重复 ${existing} 项`);
+      if (failed) pieces.push(`失败 ${failed} 项`);
+      if (status.renamed) pieces.push(`同名改名 ${status.renamed} 项`);
+      const unclassified=completed-saved-existing-failed;
+      if (unclassified) pieces.push(`未分类 ${unclassified} 项`);
+      return `保存完成 · ${pieces.join(' · ')}`;
+    }
+    function setDuplicateDetails(results=[]) {
+      const duplicates=results.filter(result=>result.status==='existing');
+      const details=$('duplicate-details');
+      details.hidden=!duplicates.length;
+      details.open=false;
+      $('duplicate-summary').textContent=duplicates.length
+        ? `查看 ${duplicates.length} 个内容完全一致的重复项（SHA-256）`
+        : '真正重复的内容';
+      $('duplicate-list').innerHTML=duplicates.map(result=>
+        `<li><strong>${escapeHtml(result.name||'资源')}</strong>：${escapeHtml(result.reason||'内容一致')}<br><code>${escapeHtml(result.matched_path||result.path||'')}</code></li>`
+      ).join('');
+    }
+    function setFailureDetails(results=[]) {
+      const failures=results.filter(result=>result.status==='failed');
+      const details=$('failure-details');
+      details.hidden=!failures.length;
+      details.open=Boolean(failures.length);
+      $('failure-summary').textContent=failures.length
+        ? `${failures.length} 个项目保存失败（其他成功结果已保留）`
+        : '保存失败的项目';
+      $('failure-list').innerHTML=failures.map(result=>
+        `<li><strong>${escapeHtml(result.name||'资源')}</strong>：${escapeHtml(result.error||'保存过程中出现未知错误')}</li>`
+      ).join('');
+      $('retry-failed').hidden=!failures.length;
+    }
+
+    async function monitorDownload(jobId, viewGeneration) {
+      while (true) {
+        await new Promise(resolve=>setTimeout(resolve,280));
+        const status = await api().download_status(jobId);
+        const currentView = state.viewGeneration===viewGeneration;
+        const current = status.current ? ` · ${status.current}` : '';
+        const progress = `正在保存 ${status.completed||0}/${status.total||0}`;
+        if (currentView) { setDownloadStatus(`${progress}${current}`,'working'); setProgress(status.completed||0, status.total||0); }
+        if (!status.done) continue;
+        state.lastDownloadJobId=jobId;
+        state.saveInProgress=false;
+        if (!currentView) return;
+        applySaveResults(status.results||[]);
+        const message = finishMessage(status);
+        const tone = status.failed ? 'err' : 'ok';
+        setDownloadStatus(message, tone);
+        render();
+        setDownloadStatus(message, tone); // render 后重设，避免被清
+        setDuplicateDetails(status.results||[]);
+        setFailureDetails(status.results||[]);
+        toast(message);
+        return;
+      }
+    }
+    async function startSave(values) {
+      if (state.saveInProgress) { toast('当前保存尚未完成，请稍候。'); return; }
+      if (!values.length) { toast('请先勾选要保存的资源。'); return; }
+      const viewGeneration=state.viewGeneration;
+      state.saveInProgress=true;
+      updateCounter();
+      document.querySelectorAll('.save-one').forEach(node=>node.disabled=true);
+      setDuplicateDetails([]);
+      setFailureDetails([]);
+      setDownloadStatus(`正在保存 0/${values.length}`,'working');
+      setProgress(0, values.length);
+      try {
+        state.lastDownloadJobId='';
+        const job = await api().start_download(values, $('folder').value);
+        if (!job.ok) throw new Error(job.message);
+        monitorDownload(job.job_id, viewGeneration);
+      } catch(error) {
+        state.saveInProgress=false;
+        if (state.viewGeneration!==viewGeneration) return;
+        render();
+        setDownloadStatus('保存未开始','err');
+        toast(error.message||'保存失败，请检查目录权限和网络连接。');
+      }
+    }
+    async function saveOne(button) {
+      if (state.saveInProgress) { toast('当前保存尚未完成，请稍候。'); return; }
+      const item = state.results[+button.dataset.group].items[+button.dataset.item];
+      button.textContent='保存中';
+      button.disabled=true;
+      await startSave([item]);
+    }
+
+    /* ── 主渲染 ─────────────────────────── */
+    function updateSummary() {
+      const total = state.results.reduce((sum,r)=>sum+r.items.length,0);
+      const failedGroups = state.results.filter(r=>r.error || !r.items.length).length;
+      const profileResults=state.results.filter(r=>r.origin_type==='profile');
+      const profileGroups=new Set(profileResults.map(r=>r.profile_url||r.source_url));
+      let summaryText = `${state.results.length} 个作品 · ${total} 个资源`;
+      if (profileGroups.size) summaryText += ` · ${profileGroups.size} 个主页来源`;
+      if (failedGroups>0) summaryText += ` · ${failedGroups} 个失败`;
+      $('summary').textContent = summaryText;
+    }
+
+    function buildSourceSection(result, group) {
+      const section=document.createElement('article');
+      const fromProfile=result.origin_type==='profile';
+      section.className=fromProfile ? 'source from-profile' : 'source';
+      section.dataset.group=group;
+      const okCount = result.items.length;
+      const cancelled=result.error_code==='PARSE-CANCELLED';
+      const label = okCount ? `${okCount} 个资源` : (cancelled?'已终止解析':'解析失败');
+      const tagClass = okCount ? (result.error?'partial':'') : 'error';
+      const originChip=fromProfile
+        ? `<span class="origin-chip">${result.profile_index?`主页作品 ${result.profile_index}/${result.profile_count}`:'主页解析'}</span>`
+        : '';
+      const storyChip=result.content_type==='story'
+        ? `<span class="story-chip">${escapeHtml(result.content_label||'限时日常')}</span>`
+        : '';
+      const error = result.error
+        ? `<div class="error-box"><div class="error-copy"><div class="error-meta"><span class="error-code">${escapeHtml(result.error_code || 'PARSE-UNKNOWN')}</span><span class="error-text">${escapeHtml(result.error)}</span></div>${result.error_hint?`<span class="error-hint">${escapeHtml(result.error_hint)}</span>`:''}</div><span class="error-actions"><button class="button light copy-link" data-url="${escapeHtml(result.page_url || result.source_url || '')}">复制原链接</button><button class="button light retry-parse" data-group="${group}" aria-label="重新解析第 ${group+1} 条链接">重新解析</button></span></div>`
+        : '';
+      section.innerHTML = `<div class="source-head">
+          <div class="source-title"><span class="source-index">${group+1}</span><div class="source-title-text"><strong>${originChip}${storyChip}${escapeHtml(result.title || '分享链接')}</strong><span>${escapeHtml(result.page_url || result.source_url || '')}</span></div></div>
+          <div class="source-head-actions">
+            ${okCount?`<button class="group-toggle" data-group="${group}">整组选中/取消</button>`:''}
+            <span class="tag ${tagClass}">${label}</span>
+          </div>
+        </div>${okCount?classifiedMedia(result,group):error}`;
+      return section;
+    }
+
+    function render() {
+      const results=$('results');
+      results.innerHTML='';
+      $('workspace').hidden=false;
+      updateSummary();
+      const profileBlocks=new Map();
+      state.results.forEach((result, group)=>{
+        const section=buildSourceSection(result,group);
+        const fromProfile=result.origin_type==='profile';
+        if (!fromProfile) {
+          results.appendChild(section);
+          return;
+        }
+        const profileKey=result.profile_url||result.source_url||`profile-${group}`;
+        let profileList=profileBlocks.get(profileKey);
+        if (!profileList) {
+          const block=document.createElement('section');
+          block.className='profile-block';
+          const displayCount=result.profile_count || state.results.filter(r=>r.origin_type==='profile' && (r.profile_url||r.source_url)===profileKey && r.profile_index).length;
+          block.innerHTML=`<header class="profile-origin">
+            <span class="profile-origin-mark">主页解析</span>
+            <span class="profile-origin-copy"><strong>${escapeHtml(result.profile_title||'抖音用户主页')}</strong><span>${escapeHtml(profileKey)}</span></span>
+            <span class="profile-origin-count">${displayCount?`最近 ${displayCount} 个作品`:'主页读取失败'}</span>
+          </header><div class="profile-result-list"></div>`;
+          results.appendChild(block);
+          profileList=block.querySelector('.profile-result-list');
+          profileBlocks.set(profileKey,profileList);
+        }
+        profileList.appendChild(section);
+      });
+      if (!state.results.length) results.innerHTML='<div class="empty">没有发现可展示的资源。请检查链接后重试。</div>';
+
+      // 事件通过 #results 委托一次性绑定（见 bindResultsDelegation），此处只做视图同步。
+      applyVisibility();
+      syncFilterButtons();
+      updateCounter();
+      syncResultPresence();
+      requestAnimationFrame(syncSaveBarHeight);
+    }
+
+    function retryResult(previous, status) {
+      const parsed=(status.results||[])[0];
+      const next=parsed || {
+        source_url: previous.source_url,
+        page_url: previous.page_url || previous.source_url,
+        title: previous.title || '分享链接',
+        status: 'empty',
+        error: status.message || '重新解析没有返回可展示的资源。',
+        error_code: status.error_code || 'PARSE-UNEXPECTED',
+        error_hint: '请稍后再试；若持续出现，请反馈错误码和原链接。',
+        retryable: true,
+        items: [],
+      };
+      next.items=Array.isArray(next.items)?next.items:[];
+      // 主页作品原位重试时，直接解析结果不会自带主页来源字段；保留原分组语义。
+      ['origin_type','profile_url','profile_title','profile_index','profile_count'].forEach(key=>{
+        if (previous[key]!==undefined) next[key]=previous[key];
+      });
+      return next;
+    }
+
+    function replaceSourceSection(group) {
+      const oldSection=$('results').querySelector(`.source[data-group="${group}"]`);
+      if (!oldSection) { render(); return; }
+      const scrollTop=window.scrollY;
+      oldSection.replaceWith(buildSourceSection(state.results[group],group));
+      updateSummary();
+      applyVisibility();
+      syncFilterButtons();
+      updateCounter();
+      // 卡片从错误态变成缩略图后高度会变化，保持用户当前阅读位置。
+      window.scrollTo(0,scrollTop);
+    }
+
+    function setRetryBusy(group, busy) {
+      state.retryGroup=busy?group:null;
+      $('parse').disabled=busy || state.parseInProgress;
+      $('clear').disabled=busy || state.parseInProgress;
+      $('paste').disabled=busy || state.parseInProgress;
+      $('links').disabled=busy || state.parseInProgress;
+      document.querySelectorAll('.retry-parse').forEach(node=>{
+        node.disabled=busy;
+        if (+node.dataset.group===group) node.textContent=busy?'重试中…':'重新解析';
+      });
+      const section=$('results').querySelector(`.source[data-group="${group}"]`);
+      if (section) section.classList.toggle('is-retrying',busy);
+    }
+
+    async function retryOne(button) {
+      const group=+button.dataset.group;
+      const previous=state.results[group];
+      if (!previous) { toast('该条解析记录已经失效。'); return; }
+      if (state.parseInProgress || state.retryGroup!==null) {
+        toast('已有解析任务正在进行，请等待结束或先终止当前任务。');
+        return;
+      }
+      const source=previous.page_url || previous.source_url;
+      if (!source) { toast('该条记录没有可重新解析的原链接。'); return; }
+      setRetryBusy(group,true);
+      try {
+        const job=await api().start_parse(source);
+        if (!job.ok) throw new Error(job.message);
+        let status;
+        while (true) {
+          await new Promise(resolve=>setTimeout(resolve,250));
+          status=await api().parse_status(job.job_id);
+          if (status.done) break;
+        }
+        state.results[group]=retryResult(previous,status);
+        replaceSourceSection(group);
+        if (!$('history-popover').hidden) setTimeout(loadParseHistory,150);
+        const current=state.results[group];
+        toast(current.items.length
+          ? `第 ${group+1} 条重新解析成功，其他结果保持不变。`
+          : `[${current.error_code||'PARSE-UNKNOWN'}] ${current.error||'重新解析仍未返回资源。'}`);
+      } catch(error) {
+        toast(error.message||'该条链接重新解析失败，请稍后再试。');
+      } finally {
+        setRetryBusy(group,false);
+      }
+    }
+
+    // 切换单张卡片的选中态（O(1)，不触发重建）。
+    function toggleCard(card) {
+      const ref = itemAt(card);
+      if (!ref) return;
+      const next = ref.item.selected===false;
+      ref.item.selected = next;
+      const check = card.querySelector('.resource-check');
+      if (check) check.checked = next;
+      card.classList.toggle('checked', next);
+      card.setAttribute('aria-checked', next);
+      updateCounter();
+    }
+
+    /* ── 事件委托：绑定一次，跨渲染复用 ── */
+    function bindResultsDelegation() {
+      const box=$('results');
+      box.addEventListener('click', async event=>{
+        const saveBtn = event.target.closest('.save-one');
+        if (saveBtn) { event.stopPropagation(); saveOne(saveBtn); return; }
+        const toggle = event.target.closest('.group-toggle');
+        if (toggle) {
+          const g=+toggle.dataset.group;
+          const entries = state.results[g].items.map((item,index)=>({group:g,index,item})).filter(visibleEntry);
+          if (!entries.length) return;
+          setSelection(entries, entries.some(e=>e.item.selected===false));
+          return;
+        }
+        const copy = event.target.closest('.copy-link');
+        if (copy) {
+          const url=copy.dataset.url;
+          if (!url) { toast('该条目没有可用链接。'); return; }
+          try { await navigator.clipboard.writeText(url); toast('原链接已复制。'); }
+          catch { toast('复制失败，请手动复制。'); }
+          return;
+        }
+        const retry = event.target.closest('.retry-parse');
+        if (retry) {
+          retryOne(retry);
+          return;
+        }
+        const card = event.target.closest('.media');
+        if (card && !event.target.closest('button,input')) toggleCard(card);
+      });
+      box.addEventListener('change', event=>{
+        const quality=event.target.closest('.quality-select');
+        if (quality) {
+          const group=state.results[+quality.dataset.group], item=group&&group.items[+quality.dataset.item];
+          if (item) {
+            item.media_url=quality.value;
+            const option=(item.quality_options||[]).find(value=>value.url===quality.value);
+            item.quality_label=option?option.label:'';
+            item.save_state='';
+          }
+          event.stopPropagation();
+          return;
+        }
+        const check = event.target.closest('.resource-check');
+        if (!check) return;
+        const card = check.closest('.media');
+        const ref = itemAt(card);
+        if (!ref) return;
+        ref.item.selected = check.checked;
+        card.classList.toggle('checked', check.checked);
+        card.setAttribute('aria-checked', check.checked);
+        updateCounter();
+      });
+      box.addEventListener('keydown', event=>{
+        if (event.key!==' ' && event.key!=='Enter') return;
+        if (event.target.closest('button,input')) return;
+        const card = event.target.closest('.media');
+        if (card) { event.preventDefault(); toggleCard(card); }
+      });
+    }
+
+    /* ── 回到顶部 ───────────────────────── */
+    function bindToTop() {
+      const btn=$('to-top');
+      const onScroll=()=>btn.classList.toggle('show', window.scrollY>240);
+      window.addEventListener('scroll', onScroll, {passive:true});
+      btn.addEventListener('click', ()=>window.scrollTo({top:0, behavior:'smooth'}));
+      onScroll();
+    }
+
+    function syncSaveBarHeight() {
+      const bar=document.querySelector('.save-bar');
+      if (!bar || !bar.offsetHeight) return;
+      document.documentElement.style.setProperty('--save-bar-height',`${Math.ceil(bar.getBoundingClientRect().height)}px`);
+    }
+    function bindSaveBarHeight() {
+      const bar=document.querySelector('.save-bar');
+      if (!bar) return;
+      if ('ResizeObserver' in window) new ResizeObserver(syncSaveBarHeight).observe(bar);
+      window.addEventListener('resize',syncSaveBarHeight,{passive:true});
+      syncSaveBarHeight();
+    }
+
+    function clearWorkspace() {
+      state.viewGeneration+=1;
+      state.results=[];
+      state.filter='all';
+      state.hideSaved=false;
+      $('links').value='';
+      updateLinkCount();
+      $('workspace').hidden=true;
+      $('results').innerHTML='';
+      $('summary').textContent='';
+      updateCounter();
+      setDownloadStatus('');
+      setDuplicateDetails([]);
+      setFailureDetails([]);
+      const notice=$('toast');
+      notice.classList.remove('show');
+      notice.textContent='';
+      syncResultPresence();
+      $('links').focus();
+    }
+
+    async function initialize() {
+      const initial=await api().get_initial_state();
+      $('folder').value=initial.folder;
+      state.maxBatchLinks=Math.max(1,Number(initial.max_batch_links)||1);
+      state.historyLimit=Math.max(1,Number(initial.history_limit)||1);
+      $('batch-note').textContent=`单次最多 ${state.maxBatchLinks} 个作品 · 无需登录`;
+      $('history-limit-copy').textContent=`保存在本机，最多 ${state.historyLimit} 条`;
+      const version=initial.version||'未知';
+      const build=initial.build?` (${initial.build})`:'';
+      $('runtime-version').textContent=`抖音素材批量解析 · 本地保存 · v${version}${build}`;
+      $('runtime-version').title=initial.app_path?`实际运行位置：${initial.app_path}`:'无法读取实际运行位置';
+      renderDiagnostics(initial.runtime||{});
+      updateLinkCount();
+      syncResultPresence(true);
+    }
+    window.addEventListener('pywebviewready', initialize);
+    window.addEventListener('focus', ()=>{ const bridge=api(); if (bridge&&bridge.clear_notification) bridge.clear_notification(); });
+    $('history-button').addEventListener('click', ()=>{
+      closeDiagnostics();
+      if ($('history-popover').hidden) openParseHistory(); else closeParseHistory();
+    });
+    $('history-close').addEventListener('click', closeParseHistory);
+    $('diagnostics-button').addEventListener('click',()=>{
+      if ($('runtime-popover').hidden) openDiagnostics(); else closeDiagnostics();
+    });
+    $('runtime-close').addEventListener('click',closeDiagnostics);
+    $('refresh-diagnostics').addEventListener('click',loadDiagnostics);
+    $('export-diagnostics').addEventListener('click',async()=>{
+      const result=await api().export_diagnostics();
+      if (!result.cancelled) toast(result.message||'诊断包导出完成。');
+    });
+    async function exportHistory(format) {
+      const result=await api().export_parse_history(format);
+      if (!result.cancelled) toast(result.message||'解析记录导出完成。');
+    }
+    $('export-history-csv').addEventListener('click',()=>exportHistory('csv'));
+    $('export-history-txt').addEventListener('click',()=>exportHistory('txt'));
+    $('history-search').addEventListener('input', ()=>{
+      clearTimeout(historySearchTimer);
+      historySearchTimer=setTimeout(loadParseHistory,180);
+    });
+    document.querySelectorAll('[data-history-filter]').forEach(button=>button.addEventListener('click',()=>{
+      state.historyFilter=button.dataset.historyFilter||'all';
+      document.querySelectorAll('[data-history-filter]').forEach(node=>node.setAttribute('aria-pressed',String(node===button)));
+      loadParseHistory();
+    }));
+    $('history-list').addEventListener('click',async event=>{
+      const link=event.target.closest('[data-history-url]');
+      if (!link || !link.dataset.historyUrl) return;
+      try { await navigator.clipboard.writeText(link.dataset.historyUrl); toast('解析前链接已复制。'); }
+      catch { toast('复制失败，请手动复制。'); }
+    });
+    document.addEventListener('click',event=>{
+      if (!$('history-popover').hidden && !event.target.closest('#history-popover,#history-button')) closeParseHistory();
+      if (!$('runtime-popover').hidden && !event.target.closest('#runtime-popover,#diagnostics-button')) closeDiagnostics();
+    });
+    document.addEventListener('keydown',event=>{
+      if (event.key==='Escape' && !$('history-popover').hidden) {
+        closeParseHistory();
+        $('history-button').focus();
+      }
+      if (event.key==='Escape' && !$('runtime-popover').hidden) { closeDiagnostics(); $('diagnostics-button').focus(); }
+    });
+    bindResultsDelegation();
+    bindToTop();
+    bindSaveBarHeight();
+    $('links').addEventListener('input', updateLinkCount);
+    updateLinkCount();
+
+    /* ── 顶部输入区按钮 ─────────────────── */
+    $('clear').addEventListener('click', clearWorkspace);
+    $('paste').addEventListener('click', async()=>{
+      try {
+        const bridge=api();
+        let text='';
+        if (bridge && bridge.clipboard_text) {
+          const result=await bridge.clipboard_text();
+          if (!result.ok) throw new Error(result.message);
+          text=result.text||'';
+        } else {
+          text=await navigator.clipboard.readText();
+        }
+        if (!text.trim()) { toast('剪贴板里没有可粘贴的文字。'); return; }
+        $('links').value += ($('links').value?'\n':'') + text;
+        updateLinkCount();
+        $('links').focus();
+      } catch(error) { toast(error.message||'无法读取剪贴板，请手动粘贴。'); }
+    });
+    async function monitorParse(jobId, viewGeneration) {
+      let lastRendered=-1;
+      try {
+        while (true) {
+          await new Promise(resolve=>setTimeout(resolve,250));
+          const status=await api().parse_status(jobId);
+          if (state.viewGeneration!==viewGeneration) return;
+          const completed=status.completed||0, total=status.total||0;
+          const copy=status.cancel_requested
+            ? '正在终止解析…'
+            : (status.done ? (status.cancelled?'已终止解析':'解析完成') : `正在解析 ${Math.min(completed+1,total||1)}/${total||'…'}`);
+          setParseProgress(completed,total,copy);
+          const resultCount=(status.results||[]).length;
+          if (resultCount!==lastRendered || status.done) {
+            state.results=status.results||[];
+            if (state.results.length || status.done) render();
+            lastRendered=resultCount;
+          }
+          if (!status.done) continue;
+          state.parseJobId='';
+          setBusy(false);
+          if (!$('history-popover').hidden) setTimeout(loadParseHistory,150);
+          toast(status.error_code && status.error_code!=='PARSE-CANCELLED'
+            ? `[${status.error_code}] ${status.message}`
+            : status.message);
+          return;
+        }
+      } catch(error) {
+        if (state.viewGeneration!==viewGeneration) return;
+        state.parseJobId='';
+        setBusy(false);
+        toast(error.message||'无法读取解析进度，请重新打开程序后再试。');
+      }
+    }
+    $('parse').addEventListener('click', async()=>{
+      const total=Math.min(extractInputLinks($('links').value).length,state.maxBatchLinks);
+      const viewGeneration=++state.viewGeneration;
+      state.results=[];
+      syncResultPresence();
+      $('workspace').hidden=true;
+      setBusy(true,total);
+      try {
+        const job = await api().start_parse($('links').value);
+        if (!job.ok) throw new Error(job.message);
+        state.parseJobId=job.job_id;
+        state.filter='all';
+        state.hideSaved=false;
+        monitorParse(job.job_id,viewGeneration);
+      } catch(error) {
+        setBusy(false);
+        toast(error.message||'解析过程出现异常，请重新打开程序后再试。');
+      }
+    });
+    $('cancel-parse').addEventListener('click', async()=>{
+      if (!state.parseJobId) return;
+      const button=$('cancel-parse');
+      button.disabled=true;
+      button.textContent='终止中…';
+      setParseProgress(0,0,'正在终止解析…');
+      try { await api().cancel_parse(state.parseJobId); }
+      catch { button.disabled=false; button.textContent='终止解析'; toast('终止请求未送达，请再试一次。'); }
+    });
+
+    /* ── 工具栏 ─────────────────────────── */
+    $('sel-all').addEventListener('click', ()=>setSelection(allItems().filter(visibleEntry), true));
+    $('sel-none').addEventListener('click', ()=>setSelection(allItems().filter(visibleEntry), false));
+    $('sel-invert').addEventListener('click', ()=>{
+      allItems().filter(visibleEntry).forEach(e=>{ e.item.selected = e.item.selected===false; });
+      syncSelectionUI();
+      updateCounter();
+    });
+    // 筛选仅切换 CSS class + 空态，不重建 DOM。
+    function setFilter(next) { state.filter = state.filter===next ? 'all' : next; applyVisibility(); syncFilterButtons(); }
+    $('filter-video').addEventListener('click', ()=>setFilter('video'));
+    $('filter-image').addEventListener('click', ()=>setFilter('image'));
+    $('hide-saved').addEventListener('click', ()=>{ state.hideSaved = !state.hideSaved; applyVisibility(); syncFilterButtons(); });
+
+    /* ── 保存栏 ─────────────────────────── */
+    $('choose').addEventListener('click', async()=>{
+      const folder=await api().choose_folder();
+      if (folder) $('folder').value=folder;
+    });
+    $('download').addEventListener('click', ()=>startSave(selectedValues()));
+    $('retry-failed').addEventListener('click',async()=>{
+      if (!state.lastDownloadJobId || state.saveInProgress) return;
+      const viewGeneration=state.viewGeneration;
+      state.saveInProgress=true;
+      setDownloadStatus('正在重试失败项…','working');
+      try {
+        const job=await api().retry_download(state.lastDownloadJobId,$('folder').value);
+        if (!job.ok) throw new Error(job.message);
+        monitorDownload(job.job_id,viewGeneration);
+      } catch(error) {
+        state.saveInProgress=false;
+        setDownloadStatus('重试未开始','err');
+        toast(error.message||'重试失败项时出现错误。');
+      }
+    });
+  </script>
+</body>
+</html>

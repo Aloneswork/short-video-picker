@@ -1,0 +1,31 @@
+# macOS and editor metadata
+.DS_Store
+.idea/
+.vscode/
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Local dependency mirrors and build outputs
+vendor/
+build/
+dist/
+dist.nosync/
+.build-staging.nosync/
+*.app
+*.dSYM/
+
+# Runtime data and diagnostics
+*.log
+*.part
+*-诊断-*.zip
+.env
+.env.*
+!.env.example
+

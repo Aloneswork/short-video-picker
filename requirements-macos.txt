@@ -1,0 +1,15 @@
+# Validated macOS 12+ / Python 3.13 build and runtime dependencies.
+PyInstaller==6.19.0
+Pillow==12.0.0
+pywebview==6.2.1
+websocket-client==1.9.0
+bottle==0.13.4
+proxy-tools==0.1.0
+typing-extensions==4.16.0
+pyobjc-core==12.2.1
+pyobjc-framework-Cocoa==12.2.1
+pyobjc-framework-Quartz==12.2.1
+pyobjc-framework-Security==12.2.1
+pyobjc-framework-WebKit==12.2.1
+pyobjc-framework-UniformTypeIdentifiers==12.2.1
+

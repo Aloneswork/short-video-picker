@@ -1,0 +1,57 @@
+name: macOS CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-14
+    timeout-minutes: 20
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONNOUSERSITE: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install locked dependencies
+        run: python -m pip install --requirement requirements-dev.txt
+
+      - name: Run Python tests
+        run: python -m pytest -q -p no:cacheprovider
+
+      - name: Check Python syntax
+        run: |
+          export PYTHONPYCACHEPREFIX="$RUNNER_TEMP/short-video-picker-pycache"
+          python -m py_compile \
+            app.py app_config.py app_logging.py core.py desktop.py \
+            parser_assistant.py preview_cache.py public_browser.py
+
+      - name: Check JavaScript syntax
+        run: sed -n '484,1353p' index.html | node --check -
+
+      - name: Check release metadata and source cleanliness
+        run: |
+          python scripts/sync_release_metadata.py --check
+          ./scripts/check_source_clean.sh
+
