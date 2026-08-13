@@ -660,6 +660,12 @@ class CoreTests(unittest.TestCase):
 
     def test_public_browser_reads_at_most_thirty_profile_works(self):
         works = [f"https://www.douyin.com/video/{7000000000000000000 + index}?from=profile" for index in range(31)]
+        # Page-wide anchors include recommended videos from other accounts.
+        # They must never be treated as this profile's works.
+        pollution = [
+            "https://www.douyin.com/video/6999999999999999999",
+            "https://www.douyin.com/video/6999999999999999998",
+        ]
 
         class FakeClient:
             def call(self, method, params=None, **kwargs):
@@ -667,7 +673,8 @@ class CoreTests(unittest.TestCase):
                     page = {
                         "title": "测试用户的主页 - 抖音",
                         "url": "https://www.douyin.com/user/profile-token",
-                        "links": works,
+                        "gridLinks": works,
+                        "allLinks": works + pollution,
                         "bodyLength": 1000,
                         "unavailable": "",
                         "challenge": False,
@@ -696,6 +703,8 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(result.title, "测试用户")
         self.assertEqual(len(result.work_urls), 30)
         self.assertNotIn("?", result.work_urls[0])
+        for url in result.work_urls:
+            self.assertNotIn(url, pollution)
 
     def test_public_browser_reads_profile_payload_cloned_by_page(self):
         work_id = "7111111111111111111"
@@ -727,7 +736,8 @@ class CoreTests(unittest.TestCase):
                     page = {
                         "title": "响应用户的主页 - 抖音",
                         "url": "https://www.douyin.com/user/profile-token",
-                        "links": [],
+                        "gridLinks": [],
+                        "allLinks": [],
                         "bodyLength": 1000,
                         "unavailable": "",
                         "challenge": False,
@@ -759,7 +769,7 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(client.capture_script_added)
         self.assertEqual(result.work_urls, [work_url])
         self.assertEqual(result.work_payloads[work_url]["desc"], "主页响应视频")
-        self.assertIn("公开作品列表响应", result.debug[-2])
+        self.assertIn("主页接口/服务端数据读取 1 个作品", result.debug[-2])
 
     def test_network_fallback_keeps_best_video_rendition(self):
         base = "https://v95-web-sz.douyinvod.com/video/tos/media-video-avc1/"
@@ -2098,3 +2108,45 @@ class CoreTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProfileSsrMergeTests(unittest.TestCase):
+    def test_merge_ssr_works_builds_payload_entries(self):
+        from public_browser import _merge_ssr_works, _profile_work_url
+
+        works = [
+            {
+                "aweme_id": "7111111111111111111",
+                "desc": "SSR 视频作品",
+                "share_url": "https://www.douyin.com/video/7111111111111111111",
+                "video_url": "https://v3.douyinvod.com/video/tos/example/ssr.mp4?mime_type=video_mp4",
+                "video_cover": "https://p3-sign.douyinpic.com/example-cover.jpeg",
+                "image_count": 0,
+                "nickname": "SSR用户",
+            },
+            {
+                "aweme_id": "7111111111111111112",
+                "desc": "SSR 图文作品",
+                "share_url": "",
+                "video_url": None,
+                "video_cover": None,
+                "image_count": 2,
+                "nickname": "SSR用户",
+            },
+        ]
+        payloads: dict = {}
+        _merge_ssr_works(works, payloads)
+        self.assertEqual(len(payloads), 2)
+        video_url = "https://www.douyin.com/video/7111111111111111111"
+        self.assertIn(video_url, payloads)
+        aweme = payloads[video_url]
+        self.assertEqual(aweme["desc"], "SSR 视频作品")
+        self.assertEqual(aweme["video"]["play_addr"]["url_list"][0], works[0]["video_url"])
+        self.assertEqual(aweme["video"]["cover"]["url_list"][0], works[0]["video_cover"])
+        # 无媒体地址的作品只保留元数据，由详情页解析补全。
+        self.assertNotIn("video", payloads["https://www.douyin.com/video/7111111111111111112"])
+        # 重复/无效条目不重复合并。
+        _merge_ssr_works([{"aweme_id": "7111111111111111111", "share_url": video_url}], payloads)
+        self.assertEqual(len(payloads), 2)
+        _merge_ssr_works([{"aweme_id": "", "share_url": ""}], payloads)
+        self.assertEqual(len(payloads), 2)

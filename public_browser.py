@@ -321,9 +321,57 @@ class PublicBrowser:
             JSON.stringify({
               title: document.querySelector('meta[property="og:title"]')?.content || document.title || '',
               url: location.href,
-              links: Array.from(document.querySelectorAll('a[href]'))
+              gridLinks: Array.from(document.querySelectorAll(
+                '[data-e2e="user-post-list"] a[href], [data-e2e="user-post-item"] a[href], ' +
+                '[class*="user-post"] a[href], #user-post-list a[href]'
+              )).map(x => x.href || '').filter(x => /\\/(?:video|note|slides)\\/\\d+/.test(x)),
+              allLinks: Array.from(document.querySelectorAll('a[href]'))
                 .map(x => x.href || '')
                 .filter(x => /\\/(?:video|note|slides)\\/\\d+/.test(x)),
+              ssrWorks: (() => {
+                const out = [];
+                const seen = new Set();
+                function firstAddr(node) {
+                  if (!node || typeof node !== 'object') return null;
+                  const list = node.url_list || node.urlList;
+                  if (Array.isArray(list)) {
+                    const url = list.find(u => typeof u === 'string' && u.startsWith('http'));
+                    return url || null;
+                  }
+                  return null;
+                }
+                function keep(aweme) {
+                  if (!aweme || typeof aweme !== 'object') return;
+                  const id = aweme.aweme_id || aweme.awemeId || '';
+                  if (!id || seen.has(id)) return;
+                  seen.add(id);
+                  const share = aweme.share_info || aweme.shareInfo || {};
+                  const video = aweme.video && typeof aweme.video === 'object' ? aweme.video : null;
+                  out.push({
+                    aweme_id: id,
+                    desc: aweme.desc || share.share_desc || '',
+                    share_url: share.share_url || share.shareUrl || '',
+                    video_url: video ? firstAddr(video.play_addr || video.playAddr) : null,
+                    video_cover: video
+                      ? firstAddr(video.cover || video.origin_cover || video.originCover || video.dynamic_cover)
+                      : null,
+                    image_count: Array.isArray(aweme.images) ? aweme.images.length : 0,
+                    nickname: ((aweme.author || aweme.author_info || {}).nickname || ''),
+                  });
+                }
+                function walk(node) {
+                  if (!node || typeof node !== 'object') return;
+                  if (Array.isArray(node)) { node.forEach(walk); return; }
+                  for (const key of ['aweme_list', 'awemeList', 'post_list', 'postList']) {
+                    const list = node[key];
+                    if (Array.isArray(list)) list.forEach(keep);
+                  }
+                  for (const key in node) { try { walk(node[key]); } catch (_) {} }
+                }
+                for (const root of [window._ROUTER_DATA, window.__INITIAL_STATE__]) walk(root);
+                try { walk(JSON.parse(decodeURIComponent(window.RENDER_DATA || ''))); } catch (_) {}
+                return out;
+              })(),
               bodyLength: (document.body?.innerText || '').length,
               unavailable: ['用户不存在', '该用户不存在', '账号已注销', '主页不存在', '暂无作品']
                 .find(x => (document.body?.innerText || '').includes(x)) || '',
@@ -427,16 +475,22 @@ class PublicBrowser:
                     pending_profile_responses,
                     work_payloads,
                 )
-                # The current public profile endpoint returns aweme_list in
-                # newest-first order. Prefer those canonical IDs, then merge
-                # the visible DOM anchors as a compatibility fallback.
+                # Server-rendered profile data belongs to the opened account and
+                # survives the security check that often blocks the aweme/post
+                # XHR. It is a first-class source, not a DOM fallback.
+                _merge_ssr_works(page.get("ssrWorks") or [], work_payloads)
+                # The public profile endpoint returns aweme_list in newest-first
+                # order. Prefer those canonical IDs, then the visible anchors of
+                # the account's own work grid. Page-wide anchors include
+                # recommended videos from other accounts and must never be
+                # treated as this profile's works.
                 for url in work_payloads:
                     if url not in seen_urls:
                         seen_urls.add(url)
                         work_urls.append(url)
                         if len(work_urls) >= limit:
                             break
-                for url in page.get("links") or []:
+                for url in page.get("gridLinks") or []:
                     canonical = _canonical_douyin_work_url(str(url))
                     if canonical and canonical not in seen_urls:
                         seen_urls.add(canonical)
@@ -514,7 +568,7 @@ class PublicBrowser:
             payload_count = sum(1 for url in work_urls[:limit] if url in work_payloads)
             if payload_count:
                 debug.append(
-                    f"已从主页自身的公开作品列表响应读取 {payload_count} 个作品媒体数据。"
+                    f"已从主页接口/服务端数据读取 {payload_count} 个作品的公开媒体数据。"
                 )
             debug.append(f"主页公开网格已找到 {len(work_urls[:limit])} 个作品。")
             selected_payloads = {
@@ -532,7 +586,9 @@ class PublicBrowser:
             )
         diagnostic = (
             f"主页诊断：URL匹配={int(page_matches)}，不可用提示={page.get('unavailable') or '无'}，"
-            f"公开作品链接={len(work_urls)}。"
+            f"公开作品链接={len(work_urls)}（作品网格={len(page.get('gridLinks') or [])}，"
+            f"页面全局链接={len(page.get('allLinks') or [])}，"
+            f"接口/服务端数据={len(work_payloads)}）。"
         )
         if page.get("unavailable"):
             code = "DY-PROFILE-UNAVAILABLE"
@@ -1186,6 +1242,44 @@ def _merge_profile_payload(
         work_url = _profile_work_url(aweme)
         if work_url:
             work_payloads.setdefault(work_url, aweme)
+
+
+def _merge_ssr_works(
+    works: list[dict[str, Any]],
+    work_payloads: dict[str, dict[str, Any]],
+) -> None:
+    """Merge the server-rendered work list of the opened profile page.
+
+    The SSR list is rendered for the account whose page is open, so it remains
+    reliable when the aweme/post XHR is blocked by the anonymous security
+    check. Entries carry only the fields the front-end needs; richer detail
+    pages are still parsed per work when media addresses are missing.
+    """
+    for work in works:
+        if not isinstance(work, dict):
+            continue
+        item_id = str(work.get("aweme_id") or "")
+        if not item_id:
+            continue
+        desc = str(work.get("desc") or "")
+        video_url = str(work.get("video_url") or "")
+        cover = str(work.get("video_cover") or "")
+        aweme: dict[str, Any] = {
+            "aweme_id": item_id,
+            "desc": desc,
+            "share_info": {
+                "share_url": str(work.get("share_url") or ""),
+                "share_desc": desc,
+            },
+            "author": {"nickname": str(work.get("nickname") or "")},
+            "images": [],
+        }
+        if video_url:
+            aweme["video"] = {
+                "play_addr": {"url_list": [video_url]},
+                "cover": {"url_list": [cover]} if cover else {},
+            }
+        _merge_profile_payload({"aweme_list": [aweme]}, work_payloads)
 
 
 def _collect_profile_response_payloads(
