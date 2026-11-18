@@ -117,6 +117,9 @@ class CoreTests(unittest.TestCase):
         self.assertIn(".thumb-main { position:absolute; z-index:1; inset:0; width:100%; height:100%; object-fit:contain; object-position:center center;", html)
         self.assertIn(".thumb-blur { position:absolute;", html)
         self.assertIn("object-fit:cover; object-position:center center; filter:blur(", html)
+        self.assertIn('class="selection-wash"', html)
+        self.assertIn('.media.checked .selection-wash { opacity:1; }', html)
+        self.assertIn('object-fit:contain; background:transparent; pointer-events:none;', html)
         self.assertIn("border:2px solid var(--line)", html)
         self.assertIn("transform:translateY(-2px)", html)
         self.assertIn("existing?' is-existing':''", html)
@@ -127,12 +130,15 @@ class CoreTests(unittest.TestCase):
         self.assertIn(".source-title-text .story-chip", html)
         self.assertIn("result.content_type==='story'", html)
         self.assertIn('id="cancel-parse"', html)
+        self.assertIn('id="profile-mode"', html)
+        self.assertIn('id="profile-disclosure"', html)
+        self.assertIn("start_parse($('links').value,profileMode)", html)
         self.assertIn("api().parse_status(jobId)", html)
         self.assertIn("saved||existing ? ''", html)
         self.assertNotIn("doneText = saved ? '已存' : '保存'", html)
         self.assertNotIn(">已存<", html)
         self.assertIn("async function retryOne(button)", html)
-        self.assertIn("state.results[group]=retryResult(previous,status)", html)
+        self.assertIn("state.results[group]=preserveItemState(retryResult(previous,status),previous)", html)
         self.assertIn("oldSection.replaceWith(buildSourceSection(state.results[group],group))", html)
         self.assertIn("window.scrollTo(0,scrollTop)", html)
         self.assertIn("retryOne(retry)", html)
@@ -162,6 +168,13 @@ class CoreTests(unittest.TestCase):
         self.assertIn("function syncResultPresence", html)
         self.assertIn("bridge.set_result_presence(hasResults)", html)
         self.assertIn("syncResultPresence();", html)
+        self.assertIn(".save-state { position:absolute; right:8px; bottom:8px;", html)
+        self.assertIn('class="preview-button"', html)
+        self.assertIn('id="media-preview" role="dialog" aria-modal="true"', html)
+        self.assertIn("if (preview) {", html)
+        self.assertIn("media.addEventListener('click',closeMediaPreview)", html)
+        self.assertIn("if (video) { video.pause(); video.removeAttribute('src'); video.load(); }", html)
+        self.assertIn("event.target===$('media-preview')", html)
 
     def test_public_author_is_extracted_and_serialised(self):
         payload = {"author": {"nickname": "测试作者"}}
@@ -1124,6 +1137,16 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(result["error_code"], "PARSE-BUSY")
         self.assertEqual(list(api._parse_jobs), ["already-running"])
 
+    def test_profile_mode_accepts_one_douyin_link_only(self):
+        api = PickerApi()
+        multiple = api.start_parse(
+            "https://v.douyin.com/one/ https://v.douyin.com/two/",
+            True,
+        )
+        unrelated = api.start_parse("https://example.com/profile", True)
+        self.assertEqual(multiple["error_code"], "PROFILE-ONE-LINK")
+        self.assertEqual(unrelated["error_code"], "PROFILE-LINK")
+
     def test_initial_state_exposes_running_build_and_path(self):
         initial = PickerApi().get_initial_state()
         self.assertEqual(initial["version"], APP_VERSION)
@@ -1237,8 +1260,10 @@ class CoreTests(unittest.TestCase):
             patch("desktop.subprocess.Popen", return_value=process) as popen,
             patch.object(api, "_record_parse_job_history"),
         ):
-            api._run_parse_job(job_id, ["https://www.douyin.com/video/7111111111111111111"])
+            api._run_parse_job(job_id, ["https://www.douyin.com/video/7111111111111111111"], True)
         self.assertEqual(popen.call_args.args[0], [sys.executable, "--parser-assistant", "--stream"])
+        parser_payload = json.loads(process.stdin.write.call_args.args[0])
+        self.assertTrue(parser_payload["profile_mode"])
 
     def test_cancelled_parse_keeps_completed_results_and_marks_pending_links(self):
         api = PickerApi()
@@ -1540,6 +1565,47 @@ class CoreTests(unittest.TestCase):
         self.assertEqual([len(event["results"]) for event in progress_events], [1, 1, 1])
         fetch_url.assert_not_called()
 
+    def test_profile_mode_merges_flaky_video_batches_and_image_resources(self):
+        source = "https://v.douyin.com/profile-example/"
+        video = lambda item_id, desc: {
+            "desc": desc,
+            "video_url": f"https://www.douyin.com/aweme/v1/play/?video_id={item_id}",
+        }
+        image = {"url": "https://p3.douyinpic.com/tos-cn/example.webp?x-signature=one"}
+        responses = [
+            {"author": {"name": "作者"}, "video": [video("a", "甲")], "cookie_source": "system"},
+            {"author": {"name": "作者"}, "video": [video("a", "甲"), video("b", "乙")]},
+            RuntimeError("temporary failure"),
+            {"author": {"name": "作者"}, "video": [video("a", "甲"), video("b", "乙"), video("c", "丙")]},
+            {"author": {"name": "作者"}, "video": [video("a", "甲"), video("b", "乙")]},
+            {"author": {"name": "作者"}, "image_list": [image], "cookie_source": "system"},
+            {"author": {"name": "作者"}, "image_list": [dict(image, url=image["url"].replace("one", "two"))]},
+        ]
+        with (
+            patch.object(parser_assistant, "_request_profile_endpoint", side_effect=responses),
+            patch.object(parser_assistant, "PublicBrowser", side_effect=AssertionError("主页模式不应启动 Edge")),
+        ):
+            result = parser_assistant.parse_payload({"links": [source], "profile_mode": True})
+
+        entry = result["results"][0]
+        self.assertTrue(result["ok"])
+        self.assertEqual(entry["origin_type"], "profile")
+        self.assertEqual([item["kind"] for item in entry["items"]], ["video", "video", "video", "image"])
+        self.assertIn("3 视频 / 1 图片", entry["title"])
+        self.assertIn("[1, 2, 3, 2]", " ".join(entry["debug"]))
+        self.assertTrue(entry["retryable"])
+
+    def test_profile_mode_stops_requesting_after_total_deadline(self):
+        with (
+            patch.object(parser_assistant, "monotonic", return_value=91),
+            patch.object(parser_assistant, "_request_profile_endpoint") as request,
+        ):
+            _items, _author, _counts, errors = parser_assistant._collect_profile_media(
+                "https://example.test/api", "https://v.douyin.com/example/", "video", "video_url", 5, 90
+            )
+        request.assert_not_called()
+        self.assertEqual(errors, ["总等待时间已到"])
+
     def test_official_iesdouyin_share_link_skips_redundant_resolution(self):
         target = "7670557704947897331"
         source = f"https://www.iesdouyin.com/share/video/{target}/?from_ssr=1"
@@ -1669,5 +1735,3 @@ class CoreTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-

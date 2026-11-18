@@ -9,8 +9,11 @@ import re
 import signal
 import sys
 from pathlib import Path
+from time import monotonic
 from typing import Any, Callable
-from urllib.parse import urlparse
+from urllib.error import HTTPError
+from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.request import Request, urlopen
 
 
 # The assistant is launched as a fresh Python process, so it must explicitly
@@ -22,11 +25,14 @@ if VENDOR_DIR.exists():
 
 from app_config import MAX_BATCH_LINKS
 from core import (
+    APP_UA,
+    MediaItem,
     ParseResult,
     extract_douyin_item_id,
     fetch_url,
     make_parse_error,
     parse_share_url,
+    suggest_name,
 )
 from public_browser import (
     PublicBrowser,
@@ -49,6 +55,10 @@ PUBLIC_SHARE_FALLBACK = {
     "DY-PAGE-SHELL",
     "DY-NO-MEDIA",
 }
+PROFILE_VIDEO_API = "https://api.s0o1.com/API/dyzy/"
+PROFILE_IMAGE_API = "https://api.s0o1.com/API/dyzy/image.php"
+PROFILE_TOTAL_TIMEOUT = 90
+PROFILE_REQUEST_TIMEOUT = 25
 
 
 def _install_termination_cleanup() -> None:
@@ -89,9 +99,147 @@ def serialise(result) -> dict[str, Any]:
         "content_type": result.content_type,
         "content_label": result.content_label,
         "author": result.author,
+        "origin_type": result.origin_type,
         "debug": result.debug,
         "items": [asdict(item) for item in result.items],
     }
+
+
+def _profile_media_key(url: str) -> str:
+    parsed = urlparse(url)
+    video_id = parse_qs(parsed.query).get("video_id", [])
+    if video_id:
+        return f"video:{video_id[0]}"
+    return parsed.path
+
+
+def _request_profile_endpoint(endpoint: str, source_url: str, timeout: float) -> dict[str, Any]:
+    request = Request(
+        f"{endpoint}?{urlencode({'msg': source_url})}",
+        headers={"User-Agent": APP_UA, "Accept": "application/json"},
+    )
+    with urlopen(request, timeout=timeout) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("接口返回格式无法识别")
+    if payload.get("error"):
+        raise RuntimeError(str(payload["error"])[:160])
+    return payload
+
+
+def _collect_profile_media(
+    endpoint: str,
+    source_url: str,
+    array_key: str,
+    url_key: str,
+    attempts: int,
+    deadline: float,
+) -> tuple[list[dict[str, Any]], str, list[int], list[str]]:
+    collected: dict[str, dict[str, Any]] = {}
+    author = ""
+    counts: list[int] = []
+    errors: list[str] = []
+    for _ in range(attempts):
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            errors.append("总等待时间已到")
+            break
+        try:
+            payload = _request_profile_endpoint(
+                endpoint,
+                source_url,
+                min(PROFILE_REQUEST_TIMEOUT, max(1, remaining)),
+            )
+            values = payload.get(array_key) or []
+            if not isinstance(values, list):
+                raise ValueError("资源列表格式无法识别")
+            counts.append(len(values))
+            author = author or str((payload.get("author") or {}).get("name") or "").strip()
+            for value in values:
+                if not isinstance(value, dict):
+                    continue
+                media_url = str(value.get(url_key) or "").strip()
+                if urlparse(media_url).scheme != "https":
+                    continue
+                collected.setdefault(_profile_media_key(media_url), value)
+        except Exception as exc:  # noqa: BLE001 - partial third-party results remain useful.
+            detail = f"HTTP {exc.code}" if isinstance(exc, HTTPError) else str(exc)[:120]
+            errors.append(detail or type(exc).__name__)
+    return list(collected.values()), author, counts, errors
+
+
+def parse_third_party_profile(source_url: str) -> ParseResult:
+    deadline = monotonic() + PROFILE_TOTAL_TIMEOUT
+    videos, author, video_counts, video_errors = _collect_profile_media(
+        PROFILE_VIDEO_API, source_url, "video", "video_url", 5, deadline
+    )
+    images, image_author, image_counts, image_errors = _collect_profile_media(
+        PROFILE_IMAGE_API, source_url, "image_list", "url", 2, deadline
+    )
+    author = author or image_author or "抖音用户"
+    headers = {"User-Agent": APP_UA, "Referer": "https://www.douyin.com/", "Accept": "*/*"}
+    items: list[MediaItem] = []
+    for index, value in enumerate(videos, start=1):
+        media_url = str(value["video_url"])
+        title = str(value.get("desc") or "").strip() or f"{author}的主页视频"
+        items.append(
+            MediaItem(
+                source_url,
+                source_url,
+                media_url,
+                "video",
+                title=title,
+                suggested_name=suggest_name(title, media_url, "video", index, source_url=source_url),
+                headers=headers,
+            )
+        )
+    for index, value in enumerate(images, start=1):
+        media_url = str(value["url"])
+        title = f"{author}的主页图片"
+        items.append(
+            MediaItem(
+                source_url,
+                source_url,
+                media_url,
+                "image",
+                title=title,
+                suggested_name=suggest_name(title, media_url, "image", index, source_url=source_url),
+                headers=headers,
+                preview_url=media_url,
+            )
+        )
+    debug = [
+        "已显式使用第三方 XiaoT API；仅发送主页链接，未发送 Cookie。",
+        f"视频接口多轮返回：{video_counts or '全部失败'}；累计 {len(videos)} 个视频。",
+        f"图集接口多轮返回：{image_counts or '全部失败'}；累计 {len(images)} 张图片。",
+        "第三方接口不返回主页作品总数或图集分组，因此不能证明已覆盖主页全部作品。",
+    ]
+    errors = video_errors + image_errors
+    if not items:
+        result = make_parse_error(
+            source_url,
+            source_url,
+            "PROFILE-API-FAILED",
+            title=f"{author} · 第三方主页",
+            status="empty",
+            debug=debug + ([f"请求异常：{'; '.join(errors)}"] if errors else []),
+        )
+        result.origin_type = "profile"
+        return result
+    return ParseResult(
+        source_url,
+        source_url,
+        f"{author} · 主页批量（{len(videos)} 视频 / {len(images)} 图片）",
+        items,
+        status="partial" if errors else "ok",
+        error="部分第三方请求失败，当前展示多轮累计结果。" if errors else "",
+        debug=debug + ([f"部分请求异常：{'; '.join(errors)}"] if errors else []),
+        retryable=bool(errors),
+        content_type="profile",
+        content_label="第三方主页",
+        author=author,
+        origin_type="profile",
+    )
 
 
 def parse_payload(
@@ -103,9 +251,6 @@ def parse_payload(
     if truncated:
         links = links[:MAX_BATCH_LINKS]
 
-    browser: PublicBrowser | None = None
-    preview_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="preview-pipeline")
-    preview_jobs = []
     parsed_entries: list[ParseResult] = []
 
     def report_progress(input_index: int, link: str, entry_start: int) -> None:
@@ -119,6 +264,23 @@ def parse_payload(
                 "results": [serialise(result) for result in parsed_entries[entry_start:]],
             }
         )
+
+    if payload.get("profile_mode"):
+        for input_index, link in enumerate(links, start=1):
+            entry_start = len(parsed_entries)
+            parsed_entries.append(parse_third_party_profile(link))
+            report_progress(input_index, link, entry_start)
+        results = [serialise(result) for result in parsed_entries]
+        total = sum(len(result["items"]) for result in results)
+        return {
+            "ok": total > 0,
+            "message": f"主页第三方解析完成，累计发现 {total} 个资源；接口未提供完整性证明",
+            "results": results,
+        }
+
+    browser: PublicBrowser | None = None
+    preview_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="preview-pipeline")
+    preview_jobs = []
 
     def ensure_browser() -> PublicBrowser:
         nonlocal browser

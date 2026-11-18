@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src https://api.s0o1.com; media-src https:; img-src https: data:; base-uri 'none'; form-action 'none'">
+  <title>抖音主页批量解析测试</title>
+  <style>
+    :root {
+      --bg:#f6f7f9; --panel:#fff; --soft:#f1f2f4; --ink:#18181b; --muted:#6b7280;
+      --line:#e3e5e8; --accent:#4f46e5; --accent-hover:#4338ca; --ok:#15803d;
+      --warn:#a16207; --warn-bg:#fff8df; --err:#b91c1c; --err-bg:#fff0f0;
+      font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    }
+    @media (prefers-color-scheme:dark) {
+      :root {
+        --bg:#0f1012; --panel:#18191c; --soft:#222327; --ink:#f4f4f5; --muted:#a1a1aa;
+        --line:#303137; --accent:#818cf8; --accent-hover:#a5b4fc; --ok:#4ade80;
+        --warn:#fbbf24; --warn-bg:#2b2414; --err:#f87171; --err-bg:#321919;
+      }
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--bg); font-size:14px; }
+    button,input { font:inherit; color:inherit; }
+    button:focus-visible,input:focus-visible,a:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+    .shell { width:min(920px,calc(100% - 28px)); margin:0 auto; padding:32px 0 56px; }
+    header { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; margin-bottom:18px; }
+    h1 { margin:0 0 6px; font-size:24px; letter-spacing:-.5px; }
+    header p,.muted { margin:0; color:var(--muted); }
+    .badge { flex:0 0 auto; padding:5px 9px; border:1px solid var(--line); border-radius:999px; color:var(--muted); background:var(--panel); font-size:11px; }
+    .panel { border:1px solid var(--line); border-radius:12px; background:var(--panel); overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+    .notice { padding:14px 16px; border-bottom:1px solid color-mix(in srgb,var(--warn) 28%,transparent); color:var(--warn); background:var(--warn-bg); line-height:1.6; }
+    .notice strong { display:block; margin-bottom:2px; }
+    form { padding:18px; }
+    label { display:block; margin-bottom:7px; font-weight:650; }
+    .row { display:flex; gap:9px; }
+    input[type="text"] { min-width:0; flex:1; height:44px; padding:0 12px; border:1px solid var(--line); border-radius:8px; background:var(--bg); }
+    input[type="text"]:focus { border-color:var(--accent); }
+    button,.action { min-height:44px; display:inline-flex; align-items:center; justify-content:center; padding:0 16px; border:0; border-radius:8px; text-decoration:none; font-weight:650; cursor:pointer; }
+    button { color:#fff; background:var(--accent); }
+    button:hover:not(:disabled) { background:var(--accent-hover); }
+    button:disabled { opacity:.45; cursor:not-allowed; }
+    .consent { display:flex; align-items:flex-start; gap:8px; margin:13px 0 0; color:var(--muted); font-weight:400; line-height:1.5; }
+    .consent input { margin-top:3px; }
+    .status { min-height:50px; display:flex; align-items:center; gap:9px; margin-top:14px; padding:13px 15px; border:1px solid var(--line); border-radius:10px; color:var(--muted); background:var(--panel); }
+    .status[data-kind="ok"] { color:var(--ok); }
+    .status[data-kind="error"] { color:var(--err); background:var(--err-bg); }
+    .spinner { width:14px; height:14px; border:2px solid var(--line); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .summary { display:flex; align-items:flex-end; justify-content:space-between; gap:14px; margin:26px 0 10px; }
+    .summary h2 { margin:0; font-size:17px; }
+    .summary p { margin:4px 0 0; color:var(--muted); }
+    .results { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; }
+    .card { min-width:0; border:1px solid var(--line); border-radius:10px; background:var(--panel); overflow:hidden; }
+    .card-head { padding:13px 14px; border-bottom:1px solid var(--line); }
+    .card small { color:var(--muted); }
+    .card h3 { min-height:42px; margin:6px 0 0; overflow:hidden; font-size:13px; line-height:1.55; font-weight:600; }
+    video,.image-preview { display:block; width:100%; aspect-ratio:16/9; background:#09090b; }
+    .image-preview { object-fit:contain; }
+    .card-actions { display:flex; gap:8px; padding:10px; }
+    .action { flex:1; min-height:36px; color:var(--ink); border:1px solid var(--line); background:var(--soft); font-size:12px; }
+    .action:hover { border-color:var(--accent); color:var(--accent); }
+    .empty { padding:30px; border:1px dashed var(--line); border-radius:10px; color:var(--muted); text-align:center; grid-column:1/-1; }
+    footer { margin-top:20px; color:var(--muted); font-size:12px; line-height:1.6; }
+    footer a { color:var(--accent); }
+    [hidden] { display:none !important; }
+    @media (max-width:620px) {
+      .shell { padding-top:20px; }
+      header,.row,.summary { align-items:stretch; flex-direction:column; }
+      .row button { width:100%; }
+    }
+    @media (prefers-reduced-motion:reduce) { .spinner { animation:none; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <h1>主页批量解析测试</h1>
+        <p>用于验证第三方接口的作品数量、归属和视频可用性。</p>
+      </div>
+      <span class="badge">未接入主程序</span>
+    </header>
+
+    <section class="panel" aria-labelledby="query-title">
+      <div class="notice">
+        <strong>第三方数据提示</strong>
+        查询会把你填写的公开主页链接或 sec_uid 发送给 api.s0o1.com，并暴露当前网络 IP。不要填写私密主页、Cookie、账号密码或其他敏感信息。
+      </div>
+      <form id="query-form">
+        <label id="query-title" for="profile-input">公开抖音主页链接或 sec_uid</label>
+        <div class="row">
+          <input id="profile-input" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://www.douyin.com/user/..." required>
+          <button id="query-button" type="submit">开始测试</button>
+        </div>
+        <label class="consent">
+          <input id="consent" type="checkbox" required>
+          <span>我确认这是公开主页，并同意将上述标识发送给 XiaoT API。</span>
+        </label>
+      </form>
+    </section>
+
+    <div id="status" class="status" role="status" aria-live="polite">等待输入公开主页。</div>
+
+    <section id="output" hidden aria-labelledby="result-title">
+      <div class="summary">
+        <div>
+          <h2 id="result-title">解析结果</h2>
+          <p id="author"></p>
+        </div>
+        <span id="count" class="badge"></span>
+      </div>
+      <div id="results" class="results"></div>
+    </section>
+
+    <footer>
+      本页只验证 API 返回结果，不会写入主程序或保存历史。视频由返回的第三方媒体地址直接播放；
+      <a href="https://api.s0o1.com/?action=doc&amp;id=33" target="_blank" rel="noopener noreferrer">查看接口文档</a>。
+    </footer>
+  </main>
+
+  <script>
+    const APIS = [
+      {url:'https://api.s0o1.com/API/dyzy/', array:'video', field:'video_url', kind:'video', attempts:5},
+      {url:'https://api.s0o1.com/API/dyzy/image.php', array:'image_list', field:'url', kind:'image', attempts:2},
+    ];
+    const MAX_RENDERED = 300;
+    const form = document.getElementById('query-form');
+    const input = document.getElementById('profile-input');
+    const button = document.getElementById('query-button');
+    const statusBox = document.getElementById('status');
+    const output = document.getElementById('output');
+    const results = document.getElementById('results');
+
+    function requestParameter(value) {
+      const match = value.match(/https?:\/\/[^\s"'<>]+/i);
+      const extracted = (match ? match[0] : value).trim().replace(/[).,;，。]+$/g, '');
+      if (!extracted.startsWith('http://') && !extracted.startsWith('https://')) return ['uid', extracted];
+      const url = new URL(extracted);
+      const host = url.hostname.toLowerCase();
+      if (url.protocol !== 'https:' || (host !== 'douyin.com' && !host.endsWith('.douyin.com'))) {
+        throw new Error('请输入 HTTPS 抖音主页链接，或直接输入 sec_uid。');
+      }
+      return ['msg', extracted];
+    }
+
+    function mediaKey(url) {
+      const parsed = new URL(url);
+      return parsed.searchParams.get('video_id') || parsed.pathname;
+    }
+
+    function normaliseResponse(payload, spec) {
+      if (!payload || typeof payload !== 'object') throw new Error('接口返回格式无法识别。');
+      if (payload.error) throw new Error(String(payload.error));
+      const items = Array.isArray(payload[spec.array]) ? payload[spec.array].flatMap(item => {
+        const url = String(item?.[spec.field] || '').trim();
+        try {
+          if (new URL(url).protocol !== 'https:') return [];
+        } catch {
+          return [];
+        }
+        return [{kind:spec.kind, desc:String(item?.desc || '').trim(), url}];
+      }) : [];
+      return {
+        author:String(payload.author?.name || '未返回作者昵称'),
+        cookieSource:String(payload.cookie_source || '未返回'),
+        items,
+      };
+    }
+
+    async function requestOnce(spec, key, parameter, deadline) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw new DOMException('总等待时间已到', 'AbortError');
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), Math.min(25000, remaining));
+      try {
+        const response = await fetch(`${spec.url}?${key}=${encodeURIComponent(parameter)}`, {
+          credentials:'omit', referrerPolicy:'no-referrer', signal:controller.signal,
+        });
+        const text = await response.text();
+        let payload;
+        try { payload = JSON.parse(text); }
+        catch { throw new Error(`接口返回的不是 JSON（HTTP ${response.status}）。`); }
+        if (!response.ok) throw new Error(payload.error || `接口请求失败（HTTP ${response.status}）。`);
+        return normaliseResponse(payload, spec);
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    async function collect(spec, key, parameter, deadline) {
+      const items = new Map();
+      const counts = [];
+      const errors = [];
+      let author = '', cookieSource = '';
+      for (let attempt = 1; attempt <= spec.attempts; attempt += 1) {
+        setStatus(`正在读取${spec.kind==='video'?'视频':'图集'} ${attempt}/${spec.attempts}，已累计 ${items.size} 项…`, '', true);
+        try {
+          const data = await requestOnce(spec, key, parameter, deadline);
+          counts.push(data.items.length);
+          if (data.author !== '未返回作者昵称') author ||= data.author;
+          if (data.cookieSource !== '未返回') cookieSource ||= data.cookieSource;
+          data.items.forEach(item => items.set(mediaKey(item.url), item));
+        } catch (error) {
+          errors.push(error?.name === 'AbortError' ? '请求超时' : String(error?.message || error));
+          if (Date.now() >= deadline) break;
+        }
+      }
+      return {items:[...items.values()], author, cookieSource, counts, errors};
+    }
+
+    function setStatus(message, kind = '', loading = false) {
+      statusBox.dataset.kind = kind;
+      statusBox.replaceChildren();
+      if (loading) {
+        const spinner = document.createElement('span');
+        spinner.className = 'spinner';
+        spinner.setAttribute('aria-hidden', 'true');
+        statusBox.append(spinner);
+      }
+      statusBox.append(document.createTextNode(message));
+    }
+
+    function render(data) {
+      document.getElementById('author').textContent = `作者：${data.author} · Cookie 来源：${data.cookieSource}`;
+      const videos=data.items.filter(item=>item.kind==='video').length;
+      const images=data.items.length-videos;
+      document.getElementById('count').textContent = `${videos} 视频 · ${images} 图片`;
+      results.replaceChildren();
+      if (!data.items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = '接口请求成功，但没有返回可用的 HTTPS 资源地址。';
+        results.append(empty);
+      }
+      const fragment = document.createDocumentFragment();
+      data.items.slice(0, MAX_RENDERED).forEach((item, index) => {
+        const card = document.createElement('article');
+        card.className = 'card';
+        const head = document.createElement('div');
+        head.className = 'card-head';
+        const number = document.createElement('small');
+        number.textContent = `${item.kind==='video'?'视频':'图片'} ${index + 1}`;
+        const title = document.createElement('h3');
+        title.textContent = item.desc || (item.kind==='video'?'未返回作品文案':'主页图集图片（接口未返回所属作品）');
+        head.append(number, title);
+        const preview = document.createElement(item.kind==='video'?'video':'img');
+        if (item.kind==='video') { preview.controls = true; preview.preload = 'none'; }
+        else { preview.className='image-preview'; preview.loading='lazy'; preview.alt='主页图集图片预览'; }
+        preview.src = item.url;
+        const actions = document.createElement('div');
+        actions.className = 'card-actions';
+        const open = document.createElement('a');
+        open.className = 'action';
+        open.href = item.url;
+        open.target = '_blank';
+        open.rel = 'noopener noreferrer';
+        open.textContent = item.kind==='video'?'打开视频地址':'打开图片地址';
+        actions.append(open);
+        card.append(head, preview, actions);
+        fragment.append(card);
+      });
+      results.append(fragment);
+      output.hidden = false;
+    }
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      output.hidden = true;
+      results.replaceChildren();
+      try {
+        const value = input.value.trim();
+        if (!value) throw new Error('请先输入主页链接或 sec_uid。');
+        const [key, parameter] = requestParameter(value);
+        button.disabled = true;
+        const deadline=Date.now()+90000;
+        const videoData=await collect(APIS[0],key,parameter,deadline);
+        const imageData=await collect(APIS[1],key,parameter,deadline);
+        const data={
+          author:videoData.author||imageData.author||'未返回作者昵称',
+          cookieSource:videoData.cookieSource||imageData.cookieSource||'未返回',
+          items:[...videoData.items,...imageData.items],
+        };
+        if (!data.items.length) throw new Error([...videoData.errors,...imageData.errors].at(-1)||'第三方接口没有返回可用资源。');
+        render(data);
+        const videos=videoData.items.length, images=imageData.items.length;
+        const suffix = data.items.length > MAX_RENDERED ? `，页面仅展示前 ${MAX_RENDERED} 项` : '';
+        setStatus(`多轮采样完成：${videos} 个视频 + ${images} 张图片${suffix}。第三方未返回主页总数，不能证明完整。`, 'ok');
+      } catch (error) {
+        const message = error?.name === 'AbortError' ? '请求超过 90 秒，已停止等待。' : String(error?.message || error);
+        setStatus(message, 'error');
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    // ponytail: inline smoke assertions cover this prototype; the app path has Python regression tests.
+    console.assert(requestParameter('文案 https://v.douyin.com/abc123/ 0@9.com')[1] === 'https://v.douyin.com/abc123/');
+    console.assert(normaliseResponse({video:[{video_url:'https://www.douyin.com/aweme/v1/play/?video_id=1'}]}, APIS[0]).items.length === 1);
+    console.assert(normaliseResponse({video:[{video_url:'javascript:alert(1)'}]}, APIS[0]).items.length === 0);
+  </script>
+</body>
+</html>

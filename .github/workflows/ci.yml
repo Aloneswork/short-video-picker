@@ -52,9 +52,10 @@ jobs:
           python -c "import re,pathlib; html=pathlib.Path('index.html').read_text(encoding='utf-8'); pathlib.Path('.ci-frontend.js').write_text('\n'.join(re.findall(r'<script>(.*?)</script>', html, re.S)), encoding='utf-8')"
           node --check .ci-frontend.js
           rm -f .ci-frontend.js
+          node tests/test_hover_preview.mjs
+          node tests/test_selection_stream.mjs
 
       - name: Check release metadata and source cleanliness
         run: |
           python scripts/sync_release_metadata.py --check
           ./scripts/check_source_clean.sh
-

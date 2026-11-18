@@ -109,10 +109,16 @@ class PickerApi:
             else Path.home() / "Library" / "Application Support" / "视频资源整理" / "parse_history.sqlite3"
         )
 
-    def start_parse(self, text: str) -> dict[str, Any]:
+    def start_parse(self, text: str, profile_mode: bool = False) -> dict[str, Any]:
         links = extract_links(text)
         if not links:
             return self._parse_api_error("INPUT-NO-LINK")
+        if profile_mode and len(links) != 1:
+            return self._parse_api_error("PROFILE-ONE-LINK")
+        if profile_mode:
+            hostname = (urlparse(links[0]).hostname or "").lower()
+            if hostname != "douyin.com" and not hostname.endswith(".douyin.com"):
+                return self._parse_api_error("PROFILE-LINK")
         truncated = len(links) > MAX_BATCH_LINKS
         links = links[:MAX_BATCH_LINKS]
         job_id = uuid4().hex
@@ -137,7 +143,7 @@ class PickerApi:
         _schedule_dock_badge("")
         threading.Thread(
             target=self._run_parse_job,
-            args=(job_id, links),
+            args=(job_id, links, bool(profile_mode)),
             daemon=True,
             name=f"parse-{job_id[:8]}",
         ).start()
@@ -399,7 +405,7 @@ class PickerApi:
                 if current is not None:
                     current["history_error"] = f"解析已完成，但记录写入失败：{exc}"
 
-    def _run_parse_job(self, job_id: str, links: list[str]) -> None:
+    def _run_parse_job(self, job_id: str, links: list[str], profile_mode: bool = False) -> None:
         process: subprocess.Popen[str] | None = None
         final_result: dict[str, Any] | None = None
         stderr = ""
@@ -426,7 +432,9 @@ class PickerApi:
             if cancel_requested:
                 self._signal_parse_process(process, signal.SIGTERM)
             elif process.stdin is not None:
-                process.stdin.write(json.dumps({"links": links}, ensure_ascii=False))
+                process.stdin.write(
+                    json.dumps({"links": links, "profile_mode": profile_mode}, ensure_ascii=False)
+                )
                 process.stdin.close()
 
             if process.stdout is not None:

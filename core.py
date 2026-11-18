@@ -76,6 +76,8 @@ class ParseResult:
     # Public author nickname, when the source page exposes it anonymously.
     # Kept at the end so older positional construction remains compatible.
     author: str = ""
+    # Marks the explicit third-party profile mode for retry and UI copy.
+    origin_type: str = ""
 
 
 # Stable, user-visible codes for failures that can occur across different
@@ -95,6 +97,21 @@ PARSE_ERROR_CATALOG: dict[str, tuple[str, str, bool]] = {
     "PARSE-BUSY": (
         "已有解析任务正在进行。",
         "请等待当前任务结束或先终止当前任务，再重试该链接。",
+        True,
+    ),
+    "PROFILE-ONE-LINK": (
+        "主页模式每次只接受一个抖音主页链接。",
+        "请只保留一段主页分享内容后重试。",
+        False,
+    ),
+    "PROFILE-LINK": (
+        "主页模式只接受抖音主页分享链接。",
+        "请粘贴包含 v.douyin.com 或 www.douyin.com 主页链接的分享内容。",
+        False,
+    ),
+    "PROFILE-API-FAILED": (
+        "第三方主页接口本次没有返回可用资源。",
+        "请稍后重试；该模式依赖 XiaoT API，无法保证主页作品完整性。",
         True,
     ),
     "NET-FETCH": (

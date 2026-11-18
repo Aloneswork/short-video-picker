@@ -1,6 +1,6 @@
 {
-  "version": "2.8.3",
-  "build": "29",
+  "version": "2.8.6",
+  "build": "32",
   "max_batch_links": 30,
   "history_limit": 1000
 }
