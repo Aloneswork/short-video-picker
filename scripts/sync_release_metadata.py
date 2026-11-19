@@ -19,6 +19,7 @@ BUILD = str(CONFIG["build"])
 def rendered(path: Path, text: str) -> str:
     text = re.sub(r"v\d+\.\d+\.\d+（Build \d+）", f"v{VERSION}（Build {BUILD}）", text)
     text = re.sub(r"视频资源整理-v\d+\.\d+\.\d+-macOS-arm64\.zip", f"视频资源整理-v{VERSION}-macOS-arm64.zip", text)
+    text = re.sub(r"short-video-picker-v\d+\.\d+\.\d+-macOS-arm64\.zip", f"short-video-picker-v{VERSION}-macOS-arm64.zip", text)
     return text
 
 
